@@ -10,6 +10,7 @@ import {
   text,
   index,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
 
 export const userTable = pgTable("users", {
@@ -60,11 +61,23 @@ export const oauthAccounts = pgTable(
   ]
 );
 
+export const bytea = customType<{ data: Uint8Array<ArrayBuffer> }>({
+  dataType() {
+    return "bytea";
+  },
+  fromDriver(value: unknown) {
+    return value as Uint8Array<ArrayBuffer>;
+  },
+  toDriver(value: Uint8Array<ArrayBuffer>) {
+    return value;
+  },
+});
+
 export const sessionTable = pgTable(
   "sessions",
   {
     id: text("id").primaryKey(),
-    secret_hash: text("secret_hash").notNull(),
+    secret_hash: bytea("secret_hash").notNull(),
     userId: uuid("user_id")
       .notNull()
       .references(() => userTable.id, { onDelete: "cascade" }),
@@ -80,3 +93,4 @@ export const sessionTable = pgTable(
 );
 
 export type Session = InferSelectModel<typeof sessionTable>;
+export type User = InferSelectModel<typeof userTable>;

@@ -1,4 +1,6 @@
-import { Session } from "@/server/schema";
+import { db } from "@/server/db";
+import { Session, sessionTable, User, userTable } from "@/server/schema";
+import { eq, gt, and, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { cache } from "react";
 
@@ -21,110 +23,100 @@ function generateSecureRandomString(): string {
   return id;
 }
 
-async function hashSecret(secret: string): Promise<Uint8Array> {
+const sessionValidTime = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export type SessionWithToken = Session & { token: string };
+
+export async function createSession(user: User): Promise<SessionWithToken> {
+  const now = new Date();
+  const id = generateSecureRandomString();
+  const secret = generateSecureRandomString();
+  const secretHash = await hashSecret(secret);
+
+  const token = `${id}.${secret}`;
+
+  const session = await db
+    .insert(sessionTable)
+    .values({
+      id,
+      userId: user.id,
+      expiresAt: new Date(now.getTime() + sessionValidTime),
+      secret_hash: secretHash,
+    })
+    .returning();
+  const newSession = session.at(0);
+  if (!newSession) {
+    throw new Error("Failed to create session");
+  }
+  return { ...newSession, token };
+}
+
+export const getCurrentSession = cache(
+  async (): Promise<{ session: Session | null; user: User | null }> => {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("session")?.value ?? null;
+    if (token === null) {
+      return { session: null, user: null };
+    }
+    const tokenParts = token.split(".");
+    if (tokenParts.length !== 2) {
+      return { session: null, user: null };
+    }
+    const [sessionId, secret] = tokenParts;
+
+    const maybeResult = await db
+      .select()
+      .from(sessionTable)
+      .where(
+        and(
+          eq(sessionTable.id, sessionId),
+          gt(sessionTable.expiresAt, sql`CURRENT_TIMESTAMP`)
+        )
+      );
+    const result = maybeResult.at(0);
+    if (result === undefined) {
+      return { session: null, user: null };
+    }
+
+    const secretHash = await hashSecret(secret);
+    if (!constantTimeEqual(result.secret_hash, secretHash)) {
+      return { session: null, user: null };
+    }
+    const maybeUser = await db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, result.userId));
+    const user = maybeUser[0] ?? null;
+    if (!user) {
+      return { session: null, user: null };
+    }
+    // Extend session if it's going to expire in less than half the valid time
+    const now = new Date();
+    if (result.expiresAt.getTime() - now.getTime() < sessionValidTime / 2) {
+      const newExpiresAt = new Date(now.getTime() + sessionValidTime);
+      await db
+        .update(sessionTable)
+        .set({ expiresAt: newExpiresAt })
+        .where(eq(sessionTable.id, result.id));
+      result.expiresAt = newExpiresAt;
+    }
+    return { session: result, user };
+  }
+);
+
+async function hashSecret(secret: string): Promise<Uint8Array<ArrayBuffer>> {
   const secretBytes = new TextEncoder().encode(secret);
   const secretHashBuffer = await crypto.subtle.digest("SHA-256", secretBytes);
   return new Uint8Array(secretHashBuffer);
 }
 
-async function createSession(db): Promise<SessionWithToken> {
-  const now = new Date();
-
-  const id = generateSecureRandomString();
-  const secret = generateSecureRandomString();
-  const secretHash = await hashSecret(secret);
-
-  const token = id + "." + secret;
-
-  const session: SessionWithToken = {
-    id,
-    secretHash,
-    createdAt: now,
-    token,
-  };
-
-  // await executeQuery(
-  //   dbPool,
-  //   "INSERT INTO session (id, secret_hash, created_at) VALUES (?, ?, ?)",
-  //   [
-  //     session.id,
-  //     session.secretHash,
-  //     Math.floor(session.createdAt.getTime() / 1000),
-  //   ]
-  // );
-
-  return session;
-}
-
-export const getCurrentSession = cache(async (): Promise<Session> => {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("session")?.value ?? null;
-  if (token === null) {
-    return { session: null, user: null };
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.byteLength !== b.byteLength) {
+    return false;
   }
-  const result = await validateSessionToken(token);
-  return result;
-});
-
-// TODO: add special branded type for session token
-async function validateSessionToken(
-  dbPool: DBPool,
-  token: string
-): Promise<Session | null> {
-  const tokenParts = token.split(".");
-  if (tokenParts.length !== 2) {
-    return null;
+  let c = 0;
+  for (let i = 0; i < a.byteLength; i++) {
+    c |= a[i] ^ b[i];
   }
-  const sessionId = tokenParts[0];
-  const sessionSecret = tokenParts[1];
-
-  const session = await getSession(dbPool, sessionId);
-  if (!session) {
-    return null;
-  }
-
-  const tokenSecretHash = await hashSecret(sessionSecret);
-  const validSecret = constantTimeEqual(tokenSecretHash, session.secretHash);
-  if (!validSecret) {
-    return null;
-  }
-
-  return session;
-}
-
-async function getSession(
-  dbPool: DBPool,
-  sessionId: string
-): Promise<Session | null> {
-  const now = new Date();
-
-  // const result = await executeQuery(
-  //   dbPool,
-  //   "SELECT id, secret_hash, created_at FROM session WHERE id = ?",
-  //   [sessionId]
-  // );
-  if (result.rows.length !== 1) {
-    return null;
-  }
-  const row = result.rows[0];
-  const session: Session = {
-    id: row[0],
-    secretHash: row[1],
-    createdAt: new Date(row[2] * 1000),
-  };
-
-  // Check expiration
-  if (
-    now.getTime() - session.createdAt.getTime() >=
-    sessionExpiresInSeconds * 1000
-  ) {
-    await deleteSession(sessionId);
-    return null;
-  }
-
-  return session;
-}
-
-async function deleteSession(dbPool: DBPool, sessionId: string): Promise<void> {
-  // await executeQuery(dbPool, "DELETE FROM session WHERE id = ?", [sessionId]);
+  return c === 0;
 }
