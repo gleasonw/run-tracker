@@ -1,3 +1,4 @@
+import { getCurrentSession, RunTrackerUser } from "@/server/session";
 import * as arctic from "arctic";
 
 if (
@@ -8,13 +9,64 @@ if (
   throw new Error("Missing Strava configuration");
 }
 
+export const STRAVA_OAUTH_COOKIE_KEY = "strava_oauth_state";
+
 export const strava = new arctic.Strava(
   process.env.STRAVA_CLIENT_ID,
   process.env.STRAVA_CLIENT_SECRET,
   process.env.STRAVA_REDIRECT_URI
 );
 
-const state = arctic.generateState();
-console.log({ arcticeState: state });
-const scopes = ["read", "activity:read_all"];
-export const stravaAuthUrl = strava.createAuthorizationURL(state, scopes);
+export type StravaAuthResponse = {
+  token_type: "Bearer";
+  expires_at: number; // epoch seconds
+  expires_in: number; // seconds until expiration
+  refresh_token: string;
+  access_token: string;
+  athlete: StravaAthlete;
+};
+
+export type StravaAthlete = {
+  id: number;
+  username: string | null;
+  resource_state: number;
+  firstname: string;
+  lastname: string;
+  bio: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  sex: "M" | "F" | null;
+  premium: boolean;
+  summit: boolean;
+  created_at: string; // ISO date-time
+  updated_at: string; // ISO date-time
+  badge_type_id: number;
+  weight: number | null;
+  profile_medium: string;
+  profile: string;
+  friend: string | null;
+  follower: string | null;
+};
+
+async function appendAuth(user: RunTrackerUser, req: Request) {
+  req.headers.set("Authorization", `Bearer ${user.strava.access_token}`);
+  return req;
+}
+
+export async function getActivities() {
+  const { session, user } = await getCurrentSession();
+  if (!user) {
+    throw new Error("Not logged in");
+  }
+  const res = await fetch("https://www.strava.com/api/v3/athlete/activities", {
+    headers: {
+      Authorization: `Bearer ${user.strava.access_token}`,
+    },
+  });
+  if (!res.ok) {
+    console.log(user);
+    throw new Error(`Error fetching activities: ${res.statusText}`);
+  }
+  return res.json();
+}

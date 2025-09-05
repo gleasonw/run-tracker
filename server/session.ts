@@ -1,5 +1,12 @@
 import { db } from "@/server/db";
-import { Session, sessionTable, User, userTable } from "@/server/schema";
+import {
+  oauthAccounts,
+  Session,
+  sessionTable,
+  User,
+  userTable,
+} from "@/server/schema";
+import { StravaAthlete } from "@/server/strava";
 import { eq, gt, and, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { cache } from "react";
@@ -22,6 +29,8 @@ function generateSecureRandomString(): string {
   }
   return id;
 }
+
+export const SESSION_TOKEN_COOKIE = "session";
 
 const sessionValidTime = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -48,13 +57,32 @@ export async function createSession(user: User): Promise<SessionWithToken> {
   if (!newSession) {
     throw new Error("Failed to create session");
   }
+  (await cookies()).set(SESSION_TOKEN_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
   return { ...newSession, token };
 }
 
+export type RunTrackerUser = {
+  user: User;
+  strava: {
+    athlete: StravaAthlete;
+    access_token: string;
+    refresh_token: string;
+    expires_at: number;
+  };
+};
+
 export const getCurrentSession = cache(
-  async (): Promise<{ session: Session | null; user: User | null }> => {
+  async (): Promise<{
+    session: Session | null;
+    user: RunTrackerUser | null;
+  }> => {
     const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value ?? null;
+    const token = cookieStore.get(SESSION_TOKEN_COOKIE)?.value ?? null;
     if (token === null) {
       return { session: null, user: null };
     }
@@ -85,14 +113,16 @@ export const getCurrentSession = cache(
     const maybeUser = await db
       .select()
       .from(userTable)
+      .innerJoin(oauthAccounts, eq(oauthAccounts.userId, userTable.id))
       .where(eq(userTable.id, result.userId));
-    const user = maybeUser[0] ?? null;
+    const user = maybeUser[0]?.users ?? null;
     if (!user) {
       return { session: null, user: null };
     }
     // Extend session if it's going to expire in less than half the valid time
     const now = new Date();
     if (result.expiresAt.getTime() - now.getTime() < sessionValidTime / 2) {
+      console.log("extending session");
       const newExpiresAt = new Date(now.getTime() + sessionValidTime);
       await db
         .update(sessionTable)
@@ -100,7 +130,21 @@ export const getCurrentSession = cache(
         .where(eq(sessionTable.id, result.id));
       result.expiresAt = newExpiresAt;
     }
-    return { session: result, user };
+    return {
+      session: result,
+      user: {
+        user,
+        strava: {
+          athlete: maybeUser[0]?.oauth_accounts.extra?.athlete as StravaAthlete,
+          access_token: maybeUser[0]?.oauth_accounts.accessTokenEnc as string,
+          refresh_token: maybeUser[0]?.oauth_accounts.refreshTokenEnc as string,
+          expires_at: Math.floor(
+            (maybeUser[0]?.oauth_accounts.accessTokenExpiresAt?.getTime() ??
+              0) / 1000
+          ),
+        },
+      },
+    };
   }
 );
 

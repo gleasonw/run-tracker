@@ -1,10 +1,8 @@
-import { stravaAuthUrl } from "@/server/strava";
-
 export default function LinkStrava() {
   return (
     <div>
       Hello.
-      <a href={stravaAuthUrl.toString()}>
+      <a href="/login/strava">
         <button className="border">Link strava</button>
       </a>
     </div>
