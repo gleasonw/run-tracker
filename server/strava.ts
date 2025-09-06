@@ -59,14 +59,36 @@ export async function getActivities() {
   if (!user) {
     throw new Error("Not logged in");
   }
-  const res = await fetch("https://www.strava.com/api/v3/athlete/activities", {
-    headers: {
-      Authorization: `Bearer ${user.strava.access_token}`,
-    },
-  });
-  if (!res.ok) {
-    console.log(user);
-    throw new Error(`Error fetching activities: ${res.statusText}`);
+  await checkRefresh(user);
+  // const res = await fetch("https://www.strava.com/api/v3/athlete/activities", {
+  //   headers: {
+  //     Authorization: `Bearer ${user.strava.access_token}`,
+  //   },
+  // });
+  // if (!res.ok) {
+  //   console.log(await res.text());
+  //   throw new Error(`Error fetching activities: ${res.statusText}`);
+  // }
+  // return res.json();
+}
+
+async function checkRefresh(user: RunTrackerUser) {
+  const now = Math.floor(Date.now() / 1000);
+  if (user.strava.expires_at < now + 60) {
+    console.log("Refreshing Strava token");
+    const newTokens = await fetch("https://www.strava.com/api/v3/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        client_id: process.env.STRAVA_CLIENT_ID!,
+        client_secret: process.env.STRAVA_CLIENT_SECRET!,
+        grant_type: "refresh_token",
+        refresh_token: user.strava.refresh_token,
+      }),
+    });
+    console.log(newTokens);
+    // update tokens in database, return old user object with new tokens
   }
-  return res.json();
 }

@@ -83,6 +83,7 @@ export const getCurrentSession = cache(
   }> => {
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_TOKEN_COOKIE)?.value ?? null;
+    console.log(token)
     if (token === null) {
       return { session: null, user: null };
     }
