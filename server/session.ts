@@ -83,7 +83,7 @@ export const getCurrentSession = cache(
   }> => {
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_TOKEN_COOKIE)?.value ?? null;
-    console.log(token)
+    console.log(token);
     if (token === null) {
       return { session: null, user: null };
     }
@@ -131,12 +131,20 @@ export const getCurrentSession = cache(
         .where(eq(sessionTable.id, result.id));
       result.expiresAt = newExpiresAt;
     }
+    const extraObject = maybeUser[0]?.oauth_accounts.extra;
+    const stravaAthlete =
+      extraObject && typeof extraObject === "object" && "athlete" in extraObject
+        ? (extraObject.athlete as StravaAthlete)
+        : null;
+    if (!stravaAthlete) {
+      throw new Error("Strava athlete data not found in session user");
+    }
     return {
       session: result,
       user: {
         user,
         strava: {
-          athlete: maybeUser[0]?.oauth_accounts.extra?.athlete as StravaAthlete,
+          athlete: stravaAthlete,
           access_token: maybeUser[0]?.oauth_accounts.accessTokenEnc as string,
           refresh_token: maybeUser[0]?.oauth_accounts.refreshTokenEnc as string,
           expires_at: Math.floor(

@@ -74,6 +74,8 @@ export async function GET(request: Request) {
 
   await sessions.createSession(newUser);
 
+  //TODO: we should probably fetch the first batch of activities for this user
+
   return new Response(null, {
     status: 302,
     headers: {
