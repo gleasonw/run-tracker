@@ -17,6 +17,15 @@ if (
   throw new Error("Missing Strava configuration");
 }
 
+export type StravaWebhookEvent = {
+  aspect_type: "create" | "update" | "delete";
+  event_time: number; // epoch seconds
+  object_id: number; // id of the object (e.g. activity id)
+  object_type: "activity" | "athlete";
+  owner_id: number; // athlete id
+  subscription_id: number;
+};
+
 export const STRAVA_OAUTH_COOKIE_KEY = "strava_oauth_state";
 
 export const strava = new arctic.Strava(
