@@ -3,6 +3,7 @@ import {
   oauthAccounts,
   RunTrackerActivity,
   stravaActivities,
+  userTable,
 } from "@/server/schema";
 import { getCurrentSession, RunTrackerUser } from "@/server/session";
 import * as arctic from "arctic";
@@ -66,9 +67,41 @@ export type StravaAthlete = {
   follower: string | null;
 };
 
-async function appendAuth(user: RunTrackerUser, req: Request) {
-  req.headers.set("Authorization", `Bearer ${user.strava.access_token}`);
-  return req;
+export async function getAccountByStravaAthleteId(
+  stravaId: string
+): Promise<RunTrackerUser | null> {
+  const resp = await db
+    .select()
+    .from(oauthAccounts)
+    .innerJoin(userTable, eq(oauthAccounts.userId, userTable.id))
+    .where(eq(oauthAccounts.providerAccountId, stravaId));
+  const user = resp[0]?.users ?? null;
+  const oauth = resp[0]?.oauth_accounts ?? null;
+
+  const extraObject = resp[0]?.oauth_accounts.extra;
+  const stravaAthlete =
+    extraObject && typeof extraObject === "object" && "athlete" in extraObject
+      ? (extraObject.athlete as StravaAthlete)
+      : null;
+
+  if (!stravaAthlete) {
+    throw new Error("Strava athlete data not found");
+  }
+
+  if (user && oauth) {
+    return {
+      user,
+      strava: {
+        athlete: stravaAthlete,
+        refresh_token: oauth.refreshTokenEnc as string,
+        access_token: oauth.accessTokenEnc as string,
+        expires_at: Math.floor(
+          (oauth.accessTokenExpiresAt?.getTime() ?? 0) / 1000
+        ),
+      },
+    };
+  }
+  return null;
 }
 
 // --------- RAW STRAVA API RESPONSE ----------
@@ -236,6 +269,36 @@ export async function getActivitiesSinceLastSundayMidnight(
     .orderBy(desc(stravaActivities.startDateLocal));
 }
 
+export async function getActivityFromStrava(args: {
+  user: RunTrackerUser;
+  activityId: string;
+}) {
+  const refreshedUser = await checkRefresh(args.user);
+  if (refreshedUser === undefined) {
+    throw new Error("Failed to refresh Strava token, cannot get activity");
+  }
+  try {
+    const res = await fetch(
+      `https://www.strava.com/api/v3/activities/${args.activityId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${refreshedUser.strava.access_token}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      console.log(await res.text());
+      return `error fetching activity`;
+    }
+
+    return res.json() as unknown as StravaActivityApi;
+  } catch (e) {
+    console.error("Error fetching activity from Strava", e);
+    return `error fetching activity`;
+  }
+}
+
 export async function getActivitiesFromStrava(user: RunTrackerUser) {
   const refreshedUser = await checkRefresh(user);
   if (refreshedUser === undefined) {
@@ -349,7 +412,7 @@ async function checkRefresh(
   return p;
 }
 
-function stravaApiToPersistedActivity(
+export function stravaApiToPersistedActivity(
   a: StravaActivityApi,
   userId: string
 ): typeof stravaActivities.$inferInsert {

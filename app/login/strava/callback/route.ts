@@ -55,6 +55,9 @@ export async function GET(request: Request) {
   //TODO: actually encrypt the tokens
   const newUser = await db.transaction(async (tx) => {
     const [user] = await tx.insert(userTable).values({}).returning();
+    if (!user) {
+      throw new Error("Failed to create user");
+    }
     await tx.insert(oauthAccounts).values({
       userId: user.id,
       provider: "strava",

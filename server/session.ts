@@ -25,7 +25,7 @@ function generateSecureRandomString(): string {
   let id = "";
   for (let i = 0; i < bytes.length; i++) {
     // >> 3 "removes" the right-most 3 bits of the byte
-    id += alphabet[bytes[i] >> 3];
+    id += alphabet[bytes[i]! >> 3];
   }
   return id;
 }
@@ -92,6 +92,10 @@ export const getCurrentSession = cache(
       return { session: null, user: null };
     }
     const [sessionId, secret] = tokenParts;
+
+    if (!sessionId || !secret) {
+      return { session: null, user: null };
+    }
 
     const maybeResult = await db
       .select()
@@ -169,7 +173,7 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
   }
   let c = 0;
   for (let i = 0; i < a.byteLength; i++) {
-    c |= a[i] ^ b[i];
+    c |= a[i]! ^ b[i]!;
   }
   return c === 0;
 }

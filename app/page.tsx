@@ -29,12 +29,6 @@ export default async function Home() {
     0
   );
   const lastWeekActivities = await getActivitiesLastWeekPeriod(session.user);
-  const lastWeekActivitiesSumMinutes = lastWeekActivities.reduce(
-    (acc, activity) => {
-      return acc + activity.movingTime / 60;
-    },
-    0
-  );
   return (
     <div className="flex flex-col items-start gap-6 p-6">
       <div className="flex items-center gap-4">
@@ -50,7 +44,7 @@ export default async function Home() {
           Import latest activities{" "}
         </button>
       </div>
-      {thisWeekTarget === null ? (
+      {thisWeekTarget === null || thisWeekTarget === undefined ? (
         <WeeklyTargetForm />
       ) : (
         <>
