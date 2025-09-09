@@ -140,7 +140,7 @@ export const stravaActivities = pgTable(
 
     // Distances / time / elevation
     distance: doublePrecision("distance").notNull(), // meters
-    movingTime: integer("moving_time"), // seconds
+    movingTime: integer("moving_time").notNull(), // seconds
     elapsedTime: integer("elapsed_time"), // seconds
     totalElevationGain: doublePrecision("total_elevation_gain"), // meters
 
@@ -189,7 +189,7 @@ export const stravaActivities = pgTable(
     endLng: doublePrecision("end_lng"),
 
     // Performance
-    averageSpeed: doublePrecision("average_speed"), // m/s
+    averageSpeed: doublePrecision("average_speed").notNull(), // m/s
     maxSpeed: doublePrecision("max_speed"), // m/s
     averageCadence: doublePrecision("average_cadence"),
     hasHeartrate: boolean("has_heartrate"),
