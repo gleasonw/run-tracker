@@ -140,9 +140,9 @@ export const stravaActivities = pgTable(
 
     // Distances / time / elevation
     distance: doublePrecision("distance").notNull(), // meters
-    movingTime: integer("moving_time").notNull(), // seconds
-    elapsedTime: integer("elapsed_time").notNull(), // seconds
-    totalElevationGain: doublePrecision("total_elevation_gain").notNull(), // meters
+    movingTime: integer("moving_time"), // seconds
+    elapsedTime: integer("elapsed_time"), // seconds
+    totalElevationGain: doublePrecision("total_elevation_gain"), // meters
 
     // Timing
     startDate: timestamp("start_date", { withTimezone: true }).notNull(), // UTC
@@ -158,26 +158,26 @@ export const stravaActivities = pgTable(
     locationCountry: varchar("location_country", { length: 128 }),
 
     // Social / counts
-    achievementCount: integer("achievement_count").notNull(),
-    kudosCount: integer("kudos_count").notNull(),
-    commentCount: integer("comment_count").notNull(),
-    athleteCount: integer("athlete_count").notNull(),
-    photoCount: integer("photo_count").notNull(),
-    prCount: integer("pr_count").notNull(),
-    totalPhotoCount: integer("total_photo_count").notNull(),
+    achievementCount: integer("achievement_count"),
+    kudosCount: integer("kudos_count"),
+    commentCount: integer("comment_count"),
+    athleteCount: integer("athlete_count"),
+    photoCount: integer("photo_count"),
+    prCount: integer("pr_count"),
+    totalPhotoCount: integer("total_photo_count"),
 
     // Map / route
     mapId: text("map_id"),
     summaryPolyline: text("summary_polyline"),
 
     // Flags
-    trainer: boolean("trainer").notNull(),
-    commute: boolean("commute").notNull(),
-    manual: boolean("manual").notNull(),
-    private: boolean("private").notNull(),
-    visibility: stravaVisibilityEnum("visibility").notNull(),
-    flagged: boolean("flagged").notNull(),
-    fromAcceptedTag: boolean("from_accepted_tag").notNull(),
+    trainer: boolean("trainer"),
+    commute: boolean("commute"),
+    manual: boolean("manual"),
+    private: boolean("private"),
+    visibility: stravaVisibilityEnum("visibility"),
+    flagged: boolean("flagged"),
+    fromAcceptedTag: boolean("from_accepted_tag"),
 
     // Gear
     gearId: varchar("gear_id", { length: 32 }),
@@ -189,23 +189,23 @@ export const stravaActivities = pgTable(
     endLng: doublePrecision("end_lng"),
 
     // Performance
-    averageSpeed: doublePrecision("average_speed").notNull(), // m/s
-    maxSpeed: doublePrecision("max_speed").notNull(), // m/s
+    averageSpeed: doublePrecision("average_speed"), // m/s
+    maxSpeed: doublePrecision("max_speed"), // m/s
     averageCadence: doublePrecision("average_cadence"),
-    hasHeartrate: boolean("has_heartrate").notNull(),
+    hasHeartrate: boolean("has_heartrate"),
     averageHeartrate: doublePrecision("average_heartrate"),
     maxHeartrate: doublePrecision("max_heartrate"),
-    heartrateOptOut: boolean("heartrate_opt_out").notNull(),
+    heartrateOptOut: boolean("heartrate_opt_out"),
     displayHideHeartrateOption: boolean(
       "display_hide_heartrate_option"
     ).notNull(),
-    elevHigh: doublePrecision("elev_high").notNull(),
-    elevLow: doublePrecision("elev_low").notNull(),
+    elevHigh: doublePrecision("elev_high"),
+    elevLow: doublePrecision("elev_low"),
     sufferScore: integer("suffer_score"),
 
     // Upload / external ids
-    uploadId: bigint("upload_id", { mode: "number" }).notNull(),
-    uploadIdStr: varchar("upload_id_str", { length: 32 }).notNull(),
+    uploadId: bigint("upload_id", { mode: "number" }),
+    uploadIdStr: varchar("upload_id_str", { length: 32 }),
     externalId: varchar("external_id", { length: 255 }),
 
     // Timestamps
