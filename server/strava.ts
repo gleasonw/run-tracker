@@ -9,6 +9,7 @@ import { getCurrentSession, RunTrackerUser } from "@/server/session";
 import * as arctic from "arctic";
 import { eq, gte, and, sql, lt, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 
 if (
   process.env.STRAVA_CLIENT_ID === undefined ||
@@ -167,7 +168,7 @@ export type StravaActivityApi = {
 };
 
 // TODO: this should probably be inline to reduce roundtrip
-export async function getUserTZ(user: RunTrackerUser) {
+export const getUserTZ = cache(async function getUserTZ(user: RunTrackerUser) {
   const result = await db.execute(sql`
 		SELECT regexp_replace(timezone, '.*\\)\\s*', '') AS tz
 		FROM ${stravaActivities}
@@ -176,7 +177,7 @@ export async function getUserTZ(user: RunTrackerUser) {
 		LIMIT 1
 	`);
   return (result.rows[0] as { tz: string } | undefined)?.tz ?? "UTC";
-}
+});
 
 export function getUserLastSundayMidnightTimestamp(
   user: RunTrackerUser,

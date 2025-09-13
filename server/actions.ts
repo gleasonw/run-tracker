@@ -1,7 +1,11 @@
 "use server";
 
 import { db } from "@/server/db";
-import { weeklyTarget, WeeklyTargetInsert } from "@/server/schema";
+import {
+  ProgressionStrategyInsert,
+  weeklyTarget,
+  WeeklyTargetInsert,
+} from "@/server/schema";
 import { getCurrentSession } from "@/server/session";
 import { pullLast30ActivitiesFromStrava } from "@/server/strava";
 import { revalidatePath } from "next/cache";
@@ -33,3 +37,7 @@ export async function createWeeklyTarget(target: WeeklyTargetInsert) {
   revalidatePath("/");
   return newTarget[0];
 }
+
+export async function createProgressionStrategy(
+  strategy: ProgressionStrategyInsert
+) {}

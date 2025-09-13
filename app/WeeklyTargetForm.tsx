@@ -1,17 +1,28 @@
 "use client";
 
 import { createWeeklyTarget } from "@/server/actions";
+import { WeeklyTargetInsert } from "@/server/schema";
 import React from "react";
 
-export function WeeklyTargetForm() {
-  const [minutes, setMinutes] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
+export function WeeklyTargetForm({
+  existingTarget,
+}: {
+  existingTarget?: WeeklyTargetInsert;
+}) {
+  const [minutes, setMinutes] = React.useState(
+    existingTarget?.activeSeconds
+      ? (existingTarget.activeSeconds / 60).toString()
+      : ""
+  );
+  const [pending, startTransition] = React.useTransition();
   return (
     <form
       onSubmit={() =>
-        createWeeklyTarget({
-          activeSeconds: parseInt(minutes) * 60,
-          source: "manual",
+        startTransition(() => {
+          createWeeklyTarget({
+            activeSeconds: parseInt(minutes) * 60,
+            source: "manual",
+          });
         })
       }
       className="w-full max-w-sm p-4 bg-white rounded-2xl shadow"
@@ -32,10 +43,10 @@ export function WeeklyTargetForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={pending}
         className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
       >
-        {loading ? "Saving…" : "Save Target"}
+        {pending ? "Saving…" : "Save Target"}
       </button>
     </form>
   );

@@ -109,6 +109,26 @@ export const weeklyTarget = pgTable("weekly_targets", {
     .notNull(),
 });
 
+export const progressionStrategy = pgTable("progression_strategies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => userTable.id, {
+    onDelete: "cascade",
+  }),
+  name: varchar("name", { length: 128 }).notNull(),
+  anchorDate: timestamp("anchor_date", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  weekProgressionMultiplier: doublePrecision("week_progression_multiplier"),
+  capTargetSeconds: integer("cap_target_seconds"),
+  deloadEveryNWeeks: integer("deload_every_n_weeks"),
+  deloadMultiplier: doublePrecision("deload_multiplier"),
+  active: boolean("active").default(true).notNull(),
+});
+
 export const stravaVisibilityEnum = pgEnum("strava_visibility", [
   "everyone",
   "followers_only",
@@ -231,3 +251,6 @@ export type RunTrackerActivity = InferSelectModel<typeof stravaActivities>;
 export type Session = InferSelectModel<typeof sessionTable>;
 export type User = InferSelectModel<typeof userTable>;
 export type WeeklyTargetInsert = InferInsertModel<typeof weeklyTarget>;
+export type ProgressionStrategyInsert = InferInsertModel<
+  typeof progressionStrategy
+>;
