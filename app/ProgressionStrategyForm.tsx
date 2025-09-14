@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { ProgressionStrategyInsert, RunTrackerActivity } from "@/server/schema";
+import { Chart, Series, Title } from "@highcharts/react";
 
 export default function ProgressionStrategyForm({
   previousWeekActivities,
@@ -39,16 +40,46 @@ export default function ProgressionStrategyForm({
     console.log(form);
   }
 
+  const weeksToHitTarget = weeksToReachStrategySeconds(
+    lastWeekSumActiveSeconds,
+    {
+      capTargetSeconds: Number(form.capTargetMinutes) * 60,
+      deloadEveryNWeeks: Number(form.deloadEveryNWeeks),
+      deloadMultiplier: Number(form.deloadMultiplier),
+      weekProgressionMultiplier: Number(form.weekProgressionMultiplier),
+    }
+  );
+
+  // TODO: should probably adjust this based on time to hit... just go a few weeks beyond
+  const sampleSpreadFor20Weeks = [
+    ...Array(
+      Number.isFinite(weeksToHitTarget) ? weeksToHitTarget + 5 : 5
+    ).keys(),
+  ].map((i) =>
+    Math.round(
+      activeSecondsAtWeek({
+        partialStrategy: {
+          capTargetSeconds: Number(form.capTargetMinutes) * 60,
+          deloadEveryNWeeks: Number(form.deloadEveryNWeeks),
+          deloadMultiplier: Number(form.deloadMultiplier),
+          weekProgressionMultiplier: Number(form.weekProgressionMultiplier),
+        },
+        startSeconds: lastWeekSumActiveSeconds,
+        weekSinceStart: i,
+      }) / 60
+    )
+  );
+
   return (
-    <div className="flex flex-col gap-5 w-full max-w-md mx-auto p-6 bg-white rounded-2xl shadow ">
-      <p>
-        Last week you ran{" "}
-        <span className="font-semibold">
-          {Math.round(lastWeekSumActiveSeconds / 60)} minutes
-        </span>
-        . How do you want to progress from there?
-      </p>
+    <div className="flex flex-col sm:grid grid-cols-2 gap-5 w-full sm:max-w-5xl mx-auto p-6 bg-white rounded-2xl shadow ">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <p>
+          Last week you ran{" "}
+          <span className="font-semibold">
+            {Math.round(lastWeekSumActiveSeconds / 60)} minutes
+          </span>
+          . How do you want to progress from there?
+        </p>
         <div>
           <label className="block text-sm font-medium mb-1">
             Every week, multiply total minutes by
@@ -106,21 +137,6 @@ export default function ProgressionStrategyForm({
             />
           </div>
         </div>
-        <p>
-          It will take{" "}
-          <span className="font-semibold">
-            {weeksToReachStrategySeconds(lastWeekSumActiveSeconds, {
-              capTargetSeconds: Number(form.capTargetMinutes) * 60,
-              deloadEveryNWeeks: Number(form.deloadEveryNWeeks),
-              deloadMultiplier: Number(form.deloadMultiplier),
-              weekProgressionMultiplier: Number(form.weekProgressionMultiplier),
-            })}{" "}
-            weeks
-          </span>{" "}
-          to reach your goal of {form.capTargetMinutes} minutes a week, or{" "}
-          {Math.round(Number(form.capTargetMinutes) / 60)} hours.
-        </p>
-
         <button
           type="submit"
           className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -128,6 +144,21 @@ export default function ProgressionStrategyForm({
           Save
         </button>
       </form>
+      <div>
+        <p>
+          It will take{" "}
+          <span className="font-semibold">{weeksToHitTarget} weeks</span> to
+          reach your goal of {form.capTargetMinutes} minutes a week, or{" "}
+          {Math.round(Number(form.capTargetMinutes) / 60)} hours.
+        </p>
+        <Chart>
+          <Series
+            type="line"
+            data={sampleSpreadFor20Weeks}
+            options={{ name: "Active Minutes" }}
+          />
+        </Chart>
+      </div>
     </div>
   );
 }
@@ -137,32 +168,63 @@ function weeksToReachStrategySeconds(
   partialStrategy: Omit<ProgressionStrategyInsert, "anchorDate" | "name">
 ) {
   const {
+    deloadEveryNWeeks: k,
+    deloadMultiplier: d,
+    weekProgressionMultiplier: m,
+    capTargetSeconds: target,
+  } = partialStrategy;
+
+  // invalid / degenerate
+  if (target == null || !m || m < 1 || baselineActiveSeconds <= 0) {
+    return Infinity;
+  }
+
+  if (baselineActiveSeconds >= target) return 0;
+
+  return Math.ceil(Math.log(target / baselineActiveSeconds) / Math.log(m));
+}
+
+function activeSecondsAtWeek(args: {
+  weekSinceStart: number;
+  partialStrategy: Omit<ProgressionStrategyInsert, "anchorDate" | "name">;
+  startSeconds: number;
+}) {
+  const {
     deloadEveryNWeeks,
     deloadMultiplier,
     weekProgressionMultiplier,
     capTargetSeconds,
-  } = partialStrategy;
+  } = args.partialStrategy;
+  const startSeconds = args.startSeconds;
+  const weeksSinceStart = args.weekSinceStart;
+
   if (
-    capTargetSeconds === null ||
-    capTargetSeconds === undefined ||
+    capTargetSeconds == null ||
     !weekProgressionMultiplier ||
-    weekProgressionMultiplier < 1
+    weekProgressionMultiplier < 1 ||
+    startSeconds <= 0 ||
+    weeksSinceStart < 0
   ) {
-    return Infinity;
+    return 0;
   }
 
-  if (
-    !deloadEveryNWeeks ||
-    deloadMultiplier === null ||
-    deloadMultiplier === undefined
-  ) {
-    return Math.ceil(
-      Math.log(capTargetSeconds / baselineActiveSeconds) /
-        Math.log(weekProgressionMultiplier)
-    );
+  function isDeloadWeek(week: number, k: number | null | undefined) {
+    return !!k && k > 0 && week > 0 && week % k === 0;
   }
 
-  return "tbd";
+  const base = startSeconds * weekProgressionMultiplier ** weeksSinceStart;
 
-  // calculate with deload
+  const deloaded = isDeloadWeek(weeksSinceStart, deloadEveryNWeeks);
+  if (base >= capTargetSeconds) {
+    if (deloaded && deloadMultiplier) {
+      return Math.max(0, capTargetSeconds * deloadMultiplier);
+    }
+    return capTargetSeconds;
+  }
+
+  if (deloaded && deloadMultiplier != null) {
+    return Math.max(0, base * deloadMultiplier);
+  }
+
+  return base;
 }
