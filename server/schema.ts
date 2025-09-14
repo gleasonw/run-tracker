@@ -14,6 +14,7 @@ import {
   doublePrecision,
   bigint,
   pgEnum,
+  decimal,
 } from "drizzle-orm/pg-core";
 
 export const userTable = pgTable("users", {
@@ -102,7 +103,7 @@ export const weeklyTarget = pgTable("weekly_targets", {
   userId: uuid("user_id").references(() => userTable.id, {
     onDelete: "cascade",
   }),
-  activeSeconds: integer("active_seconds").notNull(),
+  activeSeconds: decimal("active_seconds").notNull(),
   source: targetEnumSource("source").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
@@ -254,3 +255,4 @@ export type WeeklyTargetInsert = InferInsertModel<typeof weeklyTarget>;
 export type ProgressionStrategyInsert = InferInsertModel<
   typeof progressionStrategy
 >;
+export type ProgressionStrategy = InferSelectModel<typeof progressionStrategy>;

@@ -8,16 +8,13 @@ import { Button } from "@/components/ui/button";
 import { importFirst30Activities } from "@/server/actions";
 import { db } from "@/server/db";
 import { getCurrentSession } from "@/server/session";
-import {
-  getActivitiesLastWeekPeriod,
-  getActivitiesSinceLastSundayMidnight,
-} from "@/server/strava";
-import {
-  getLastWeekTarget,
-  getThisWeekTarget as getThisWeekTargetOrMakeNew,
-} from "@/server/targets";
+import { eq, desc } from "drizzle-orm";
+import { getActivitiesSinceLastSundayMidnight } from "@/server/strava";
+import { getThisWeekTarget as getThisWeekTargetOrMakeNew } from "@/server/targets";
 import { Edit } from "lucide-react";
 import Link from "next/link";
+import { progressionStrategy } from "@/server/schema";
+import { getUserLatestStrategy } from "@/server/strategies";
 
 export default async function Home() {
   const session = await getCurrentSession();
@@ -31,6 +28,7 @@ export default async function Home() {
   const activitiesSince = await getActivitiesSinceLastSundayMidnight(
     session.user
   );
+  const userStrategy = await getUserLatestStrategy(session.user);
   // TODO: we should probably do this in a cron or something, rather than on page visit.
   const thisWeekTarget = await getThisWeekTargetOrMakeNew(session.user);
   const thisWeekActivitiesSumMinutes = activitiesSince.reduce(
@@ -42,7 +40,7 @@ export default async function Home() {
 
   const toRunMinutes = thisWeekTarget
     ? Math.round(
-        thisWeekTarget.activeSeconds / 60 - thisWeekActivitiesSumMinutes
+        Number(thisWeekTarget.activeSeconds) / 60 - thisWeekActivitiesSumMinutes
       )
     : 0;
   return (
@@ -53,9 +51,15 @@ export default async function Home() {
           src={session.user?.strava.athlete.profile}
           alt="profile"
         />
-        <Link href="/progressionStrategy">
-          <Button variant="outline">Create progression strategy</Button>
-        </Link>
+        {userStrategy ? (
+          <div>
+            <pre>{userStrategy.capTargetSeconds}</pre>
+          </div>
+        ) : (
+          <Link href="/progressionStrategy">
+            <Button variant="outline">Create progression strategy</Button>
+          </Link>
+        )}
         <Button
           variant="outline"
           onClick={importFirst30Activities}
@@ -71,7 +75,7 @@ export default async function Home() {
           <div className="flex items-center gap-4 w-full">
             <h1 className="flex gap-2 align-bottom">
               <span className="font-bold text-xl">
-                {Math.round(thisWeekTarget.activeSeconds / 60)} minutes{" "}
+                {Math.round(Number(thisWeekTarget.activeSeconds) / 60)} minutes{" "}
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" aria-label={"Edit target"}>

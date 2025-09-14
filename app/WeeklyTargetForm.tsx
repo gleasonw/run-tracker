@@ -11,7 +11,7 @@ export function WeeklyTargetForm({
 }) {
   const [minutes, setMinutes] = React.useState(
     existingTarget?.activeSeconds
-      ? (existingTarget.activeSeconds / 60).toString()
+      ? (Number(existingTarget.activeSeconds) / 60).toString()
       : ""
   );
   const [pending, startTransition] = React.useTransition();
@@ -20,7 +20,7 @@ export function WeeklyTargetForm({
       onSubmit={() =>
         startTransition(() => {
           createWeeklyTarget({
-            activeSeconds: parseInt(minutes) * 60,
+            activeSeconds: (parseInt(minutes) * 60).toString(),
             source: "manual",
           });
         })

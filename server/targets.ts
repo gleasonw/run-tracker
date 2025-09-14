@@ -2,6 +2,10 @@ import { db } from "@/server/db";
 import { weeklyTarget } from "@/server/schema";
 import { RunTrackerUser } from "@/server/session";
 import {
+  getUserLatestStrategy,
+  isDeloadWeekForStrategy,
+} from "@/server/strategies";
+import {
   getActivitiesLastWeekPeriod,
   getUserLastLastSundayMidnightTimestamp,
   getUserLastSundayMidnightTimestamp,
@@ -28,6 +32,7 @@ export async function getThisWeekTarget(user: RunTrackerUser) {
     return targetsForThisWeek[0];
   }
 
+  const userStrategy = await getUserLatestStrategy(user);
   const lastWeekTargetResponse = await getLastWeekTarget(user);
   const lastWeekTarget = lastWeekTargetResponse[0];
   const lastWeekActivities = await getActivitiesLastWeekPeriod(user);
@@ -42,24 +47,37 @@ export async function getThisWeekTarget(user: RunTrackerUser) {
     },
     0
   );
-  let newThisWeekActiveSeconds = 0;
 
-  if (
+  let newThisWeekActiveSeconds = 0;
+  const base =
     lastWeekTarget &&
-    lastWeekTarget.activeSeconds < lastWeekSumActiveSeconds
-  ) {
-    // the user exceeded their target last week, don't rely on the actual
-    newThisWeekActiveSeconds = Math.round(lastWeekTarget.activeSeconds * 1.1);
+    Number(lastWeekTarget.activeSeconds) < lastWeekSumActiveSeconds
+      ? Number(lastWeekTarget.activeSeconds)
+      : lastWeekSumActiveSeconds;
+  if (userStrategy) {
+    if (
+      isDeloadWeekForStrategy(userStrategy) &&
+      userStrategy.deloadMultiplier
+    ) {
+      newThisWeekActiveSeconds = base * userStrategy.deloadMultiplier;
+      console.log(
+        newThisWeekActiveSeconds,
+        base,
+        userStrategy.deloadMultiplier
+      );
+    } else {
+      newThisWeekActiveSeconds =
+        base * (userStrategy.weekProgressionMultiplier ?? 1.1);
+    }
   } else {
-    // the user didn't meet their target last week, so use actuals
-    newThisWeekActiveSeconds = Math.round(lastWeekSumActiveSeconds * 1.1);
+    newThisWeekActiveSeconds = base * 1.1;
   }
 
   const newTarget = await db
     .insert(weeklyTarget)
     .values({
       userId: user.user.id,
-      activeSeconds: newThisWeekActiveSeconds,
+      activeSeconds: newThisWeekActiveSeconds.toString(),
       source: "auto",
     })
     .returning();

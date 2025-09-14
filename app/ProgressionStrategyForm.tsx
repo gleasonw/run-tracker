@@ -4,13 +4,22 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { ProgressionStrategyInsert, RunTrackerActivity } from "@/server/schema";
 import { Chart, Series, Title } from "@highcharts/react";
+import { createProgressionStrategy } from "@/server/actions";
+type ProgressionStrategyFrom = {
+  name: string;
+  capTargetMinutes: string;
+  deloadEveryNWeeks: string;
+  deloadMultiplier: string;
+  weekProgressionMultiplier: string;
+  active: boolean;
+};
 
 export default function ProgressionStrategyForm({
   previousWeekActivities,
 }: {
   previousWeekActivities: { movingTime: number }[];
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ProgressionStrategyFrom>({
     name: "",
     capTargetMinutes: "",
     deloadEveryNWeeks: "",
@@ -34,10 +43,23 @@ export default function ProgressionStrategyForm({
     }));
   }
 
+  function castFormToNumber(toNumberForm: ProgressionStrategyFrom) {
+    return {
+      ...toNumberForm,
+      capTargetMinutes: Number(toNumberForm.capTargetMinutes),
+      deloadEveryNWeeks: Number(toNumberForm.deloadEveryNWeeks),
+      deloadMultiplier: Number(toNumberForm.deloadMultiplier),
+      weekProgressionMultiplier: Number(toNumberForm.weekProgressionMultiplier),
+    };
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // TODO: send to API
-    console.log(form);
+    const toNumber = castFormToNumber(form);
+    createProgressionStrategy({
+      ...toNumber,
+      capTargetSeconds: toNumber.capTargetMinutes * 60,
+    });
   }
 
   const weeksToHitTarget = weeksToReachStrategySeconds(
@@ -86,7 +108,7 @@ export default function ProgressionStrategyForm({
           </label>
           <Input
             type="number"
-            step="0.05"
+            step="0.01"
             placeholder="e.g. 1.1 for 10% weekly increase"
             min="1"
             name="weekProgressionMultiplier"
