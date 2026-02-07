@@ -64,7 +64,7 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col items-start gap-6 p-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         {stravaUser ? (
           <img
             className="h-10 w-10"
