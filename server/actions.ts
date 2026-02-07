@@ -12,6 +12,7 @@ import {
   getStravaAccountForUser,
   pullLast30ActivitiesFromStrava,
 } from "@/server/strava";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 // the idea here is that we have a server action layer that I
@@ -58,19 +59,58 @@ export async function createProgressionStrategy(
   const dow = nextSundayMidnight.getDate();
   const daysToNextSunday = (7 - dow) % 7 || 7;
   nextSundayMidnight.setDate(nextSundayMidnight.getDate() + daysToNextSunday);
-  const newStrategy = await db
-    .insert(progressionStrategy)
-    .values({
-      userId: user.user.id,
-      name: strategy.name,
-      anchorDate: nextSundayMidnight,
-      capTargetSeconds: strategy.capTargetSeconds,
-      deloadEveryNWeeks: strategy.deloadEveryNWeeks,
-      deloadMultiplier: strategy.deloadMultiplier,
-      weekProgressionMultiplier: strategy.weekProgressionMultiplier,
-      active: strategy.active,
-    })
-    .returning();
+  const newStrategy = await db.transaction(async (tx) => {
+    await tx
+      .update(progressionStrategy)
+      .set({
+        active: false,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(progressionStrategy.userId, user.user.id),
+          eq(progressionStrategy.active, true)
+        )
+      );
+
+    return tx
+      .insert(progressionStrategy)
+      .values({
+        userId: user.user.id,
+        name: strategy.name,
+        anchorDate: nextSundayMidnight,
+        capTargetSeconds: strategy.capTargetSeconds,
+        deloadEveryNWeeks: strategy.deloadEveryNWeeks,
+        deloadMultiplier: strategy.deloadMultiplier,
+        weekProgressionMultiplier: strategy.weekProgressionMultiplier,
+        active: strategy.active,
+      })
+      .returning();
+  });
   revalidatePath("/progressionStrategy");
+  revalidatePath("/");
   return newStrategy[0];
+}
+
+export async function clearProgressionStrategy() {
+  const { user } = await getCurrentSession();
+  if (user === null) {
+    throw new Error("Not authenticated");
+  }
+
+  await db
+    .update(progressionStrategy)
+    .set({
+      active: false,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(progressionStrategy.userId, user.user.id),
+        eq(progressionStrategy.active, true)
+      )
+    );
+
+  revalidatePath("/");
+  revalidatePath("/progressionStrategy");
 }

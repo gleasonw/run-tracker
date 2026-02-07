@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { ProgressionStrategyInsert, RunTrackerActivity } from "@/server/schema";
-import { Chart, Series, Title } from "@highcharts/react";
+import { ProgressionStrategyInsert } from "@/server/schema";
+import { Chart, Series } from "@highcharts/react";
 import { createProgressionStrategy } from "@/server/actions";
+import { useRouter } from "next/navigation";
 type ProgressionStrategyFrom = {
   name: string;
   capTargetMinutes: string;
@@ -19,6 +20,8 @@ export default function ProgressionStrategyForm({
 }: {
   previousWeekActivities: { movingTime: number }[];
 }) {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<ProgressionStrategyFrom>({
     name: "",
     capTargetMinutes: "",
@@ -36,7 +39,7 @@ export default function ProgressionStrategyForm({
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
       [name]: value,
@@ -53,13 +56,20 @@ export default function ProgressionStrategyForm({
     };
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setIsSubmitting(true);
     const toNumber = castFormToNumber(form);
-    createProgressionStrategy({
-      ...toNumber,
-      capTargetSeconds: toNumber.capTargetMinutes * 60,
-    });
+    try {
+      await createProgressionStrategy({
+        ...toNumber,
+        capTargetSeconds: toNumber.capTargetMinutes * 60,
+      });
+      router.push("/");
+      router.refresh();
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const weeksToHitTarget = weeksToReachStrategySeconds(
@@ -161,9 +171,10 @@ export default function ProgressionStrategyForm({
         </div>
         <button
           type="submit"
+          disabled={isSubmitting}
           className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          Save
+          {isSubmitting ? "Saving..." : "Save"}
         </button>
       </form>
       <div>

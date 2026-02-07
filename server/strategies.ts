@@ -1,13 +1,18 @@
 import { db } from "@/server/db";
 import { ProgressionStrategy, progressionStrategy } from "@/server/schema";
 import { AuthenticatedUser } from "@/server/session";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 
 export async function getUserLatestStrategy(user: AuthenticatedUser) {
   const userStrategyResp = await db
     .select()
     .from(progressionStrategy)
-    .where(eq(progressionStrategy.userId, user.user.id))
+    .where(
+      and(
+        eq(progressionStrategy.userId, user.user.id),
+        eq(progressionStrategy.active, true)
+      )
+    )
     .orderBy(desc(progressionStrategy.createdAt))
     .limit(1);
 
@@ -15,40 +20,39 @@ export async function getUserLatestStrategy(user: AuthenticatedUser) {
 }
 
 export function isDeloadWeekForStrategy(strategy: ProgressionStrategy) {
+  return isDeloadWeekForStrategyAtOffset(strategy, 0);
+}
+
+export function isDeloadWeekForStrategyAtOffset(
+  strategy: ProgressionStrategy,
+  offsetWeeks: number
+) {
   if (
     strategy.deloadEveryNWeeks === null ||
     strategy.deloadMultiplier === null
   ) {
     return false;
   }
-  const thisWeekStartSunday = new Date();
-  thisWeekStartSunday.setHours(0, 0, 0, 0);
-  thisWeekStartSunday.setDate(
-    thisWeekStartSunday.getDate() - thisWeekStartSunday.getDay()
-  );
-
-  if (thisWeekStartSunday < strategy.anchorDate) {
+  const thisWeekStartSunday = getStartOfWeekSunday(new Date());
+  const anchorWeekSunday = getStartOfWeekSunday(strategy.anchorDate);
+  if (thisWeekStartSunday < anchorWeekSunday) {
     return false;
   }
 
-  const aUTC = Date.UTC(
-    thisWeekStartSunday.getFullYear(),
-    thisWeekStartSunday.getMonth(),
-    thisWeekStartSunday.getDate()
+  const weeksSinceAnchorStart = Math.floor(
+    (thisWeekStartSunday.getTime() - anchorWeekSunday.getTime()) / 604_800_000
   );
-  const bUTC = Date.UTC(
-    strategy.anchorDate.getFullYear(),
-    strategy.anchorDate.getMonth(),
-    strategy.anchorDate.getDate()
-  );
-  const days = Math.round((bUTC - aUTC) / 86_400_000);
-  const weeksSinceAnchorStart = Math.floor(days / 7);
+  const weekIndex = weeksSinceAnchorStart + offsetWeeks;
 
-  if (
-    weeksSinceAnchorStart &&
-    weeksSinceAnchorStart % Number(strategy.deloadEveryNWeeks) === 0
-  ) {
-    return true;
-  }
-  return false;
+  return (
+    weekIndex > 0 &&
+    weekIndex % Number(strategy.deloadEveryNWeeks) === 0
+  );
+}
+
+function getStartOfWeekSunday(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
 }

@@ -44,6 +44,11 @@ export default async function Home() {
         Number(thisWeekTarget.activeSeconds) / 60 - thisWeekActivitiesSumMinutes
       )
     : 0;
+  const thisWeekTargetMinutes = thisWeekTarget
+    ? Math.round(Number(thisWeekTarget.activeSeconds) / 60)
+    : null;
+  const thisWeekCompletedMinutes = Math.round(thisWeekActivitiesSumMinutes);
+
   return (
     <div className="flex flex-col items-start gap-6 p-6">
       <div className="flex items-center gap-4">
@@ -58,15 +63,13 @@ export default async function Home() {
             <Button variant="outline">Link Strava</Button>
           </Link>
         )}
-        {userStrategy ? (
-          <div>
-            <pre>{userStrategy.capTargetSeconds}</pre>
-          </div>
-        ) : (
-          <Link href="/progressionStrategy">
-            <Button variant="outline">Create progression strategy</Button>
-          </Link>
-        )}
+        <Link href="/progressionStrategy">
+          <Button variant="outline">
+            {userStrategy
+              ? "Manage progression strategy"
+              : "Create progression strategy"}
+          </Button>
+        </Link>
         <Button
           variant="outline"
           onClick={importFirst30Activities}
@@ -76,44 +79,54 @@ export default async function Home() {
           {stravaUser ? "Import latest activities" : "Link Strava to import"}
         </Button>
       </div>
+
       {thisWeekTarget === null || thisWeekTarget === undefined ? (
         <WeeklyTargetForm />
       ) : (
-        <>
-          <div className="flex items-center gap-4 w-full">
-            <h1 className="flex gap-2 align-bottom">
-              <span className="font-bold text-xl">
-                {Math.round(Number(thisWeekTarget.activeSeconds) / 60)} minutes{" "}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" aria-label={"Edit target"}>
-                      <Edit />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    <WeeklyTargetForm existingTarget={thisWeekTarget} />
-                  </PopoverContent>
-                </Popover>
-              </span>
-            </h1>
-          </div>
-          <div>
-            {toRunMinutes > 0 ? (
+        <div className="w-full">
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                Maybe run <span className="font-bold">{toRunMinutes}</span> more
-                minutes
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  This Week Goal
+                </p>
+                <h1 className="text-3xl font-bold">
+                  {thisWeekTargetMinutes} min
+                  <span className="ml-2 text-base font-medium text-gray-500">
+                    this week
+                  </span>
+                </h1>
               </div>
-            ) : (
-              <div>
-                You have achieved your goal by running{" "}
-                <span className="font-semibold">
-                  {Math.round(thisWeekActivitiesSumMinutes)}
-                </span>{" "}
-                minutes
-              </div>
-            )}
-          </div>
-        </>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" aria-label={"Edit target"}>
+                    <Edit />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <WeeklyTargetForm existingTarget={thisWeekTarget} />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <p className="mt-3 text-base">
+              {toRunMinutes > 0 ? (
+                <>
+                  Maybe run <span className="font-bold">{toRunMinutes}</span>{" "}
+                  more minutes this week.
+                </>
+              ) : (
+                <>
+                  You have achieved this week&apos;s goal by running{" "}
+                  <span className="font-semibold">
+                    {thisWeekCompletedMinutes}
+                  </span>{" "}
+                  minutes.
+                </>
+              )}
+            </p>
+          </section>
+        </div>
       )}
 
       <div className="w-full">
@@ -128,7 +141,9 @@ export default async function Home() {
               className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
-                <h3 className="text-base font-semibold leading-tight">{act.name}</h3>
+                <h3 className="text-base font-semibold leading-tight">
+                  {act.name}
+                </h3>
                 <span className="text-sm text-gray-500 shrink-0">
                   {dateFormatter.format(new Date(act.startDateLocal))}
                 </span>
