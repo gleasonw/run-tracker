@@ -6,14 +6,14 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { importFirst30Activities } from "@/server/actions";
-import { db } from "@/server/db";
 import { getCurrentSession } from "@/server/session";
-import { eq, desc } from "drizzle-orm";
-import { getActivitiesSinceLastSundayMidnight } from "@/server/strava";
+import {
+  getActivitiesSinceLastSundayMidnight,
+  getStravaAccountForUser,
+} from "@/server/strava";
 import { getThisWeekTarget as getThisWeekTargetOrMakeNew } from "@/server/targets";
 import { Edit } from "lucide-react";
 import Link from "next/link";
-import { progressionStrategy } from "@/server/schema";
 import { getUserLatestStrategy } from "@/server/strategies";
 
 export default async function Home() {
@@ -21,10 +21,11 @@ export default async function Home() {
   if (!session.user) {
     return (
       <div>
-        Please log in here: <Link href="/link">Login</Link>
+        Please sign in here: <Link href="/link">Login with Google</Link>
       </div>
     );
   }
+  const stravaUser = await getStravaAccountForUser(session.user);
   const activitiesSince = await getActivitiesSinceLastSundayMidnight(
     session.user
   );
@@ -46,11 +47,17 @@ export default async function Home() {
   return (
     <div className="flex flex-col items-start gap-6 p-6">
       <div className="flex items-center gap-4">
-        <img
-          className="h-10 w-10"
-          src={session.user?.strava.athlete.profile}
-          alt="profile"
-        />
+        {stravaUser ? (
+          <img
+            className="h-10 w-10"
+            src={stravaUser.strava.athlete.profile}
+            alt="profile"
+          />
+        ) : (
+          <Link href="/link">
+            <Button variant="outline">Link Strava</Button>
+          </Link>
+        )}
         {userStrategy ? (
           <div>
             <pre>{userStrategy.capTargetSeconds}</pre>
@@ -63,9 +70,10 @@ export default async function Home() {
         <Button
           variant="outline"
           onClick={importFirst30Activities}
+          disabled={!stravaUser}
           className="border p-3 hover:bg-gray-200 hover:cursor-pointer"
         >
-          Import latest activities{" "}
+          {stravaUser ? "Import latest activities" : "Link Strava to import"}
         </Button>
       </div>
       {thisWeekTarget === null || thisWeekTarget === undefined ? (
@@ -108,52 +116,100 @@ export default async function Home() {
         </>
       )}
 
-      <table className="min-w-full divide-y divide-gray-200 rounded-lg overflow-hidden shadow">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600">
-              Name
-            </th>
-            <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600">
-              Date
-            </th>
-            <th className="px-4 py-2 text-right text-sm font-semibold text-gray-600">
-              Distance
-            </th>
-            <th className="px-4 py-2 text-right text-sm font-semibold text-gray-600">
-              Time
-            </th>
-            <th className="px-4 py-2 text-right text-sm font-semibold text-gray-600">
-              Avg HR
-            </th>
-            <th className="px-4 py-2 text-right text-sm font-semibold text-gray-600">
-              Speed
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
+      <div className="w-full">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          This Week Activities
+        </h2>
+
+        <div className="md:hidden space-y-3">
           {activitiesSince.map((act) => (
-            <tr key={act.name + act.startDateLocal}>
-              <td className="px-4 py-2 text-sm">{act.name}</td>
-              <td className="px-4 py-2 text-sm text-gray-500">
-                {dateFormatter.format(new Date(act.startDateLocal))}
-              </td>
-              <td className="px-4 py-2 text-sm text-right">
-                {kmToMiles(act.distance)}
-              </td>
-              <td className="px-4 py-2 text-sm text-right">
-                {formatMinutes(act.movingTime)}
-              </td>
-              <td className="px-4 py-2 text-sm text-right">
-                {act.averageHR ? Math.round(act.averageHR) : "-"}
-              </td>
-              <td className="px-4 py-2 text-sm text-right">
-                {metersPerSecondToMinutesPerMile(act.averageSpeed)}
-              </td>
-            </tr>
+            <article
+              key={act.name + act.startDateLocal}
+              className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-base font-semibold leading-tight">{act.name}</h3>
+                <span className="text-sm text-gray-500 shrink-0">
+                  {dateFormatter.format(new Date(act.startDateLocal))}
+                </span>
+              </div>
+              <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-gray-500">
+                    Distance
+                  </dt>
+                  <dd>{kmToMiles(act.distance)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-gray-500">
+                    Time
+                  </dt>
+                  <dd>{formatMinutes(act.movingTime)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-gray-500">
+                    Avg HR
+                  </dt>
+                  <dd>{act.averageHR ? Math.round(act.averageHR) : "-"}</dd>
+                </div>
+                <div className="col-span-3">
+                  <dt className="text-xs uppercase tracking-wide text-gray-500">
+                    Speed
+                  </dt>
+                  <dd>{metersPerSecondToMinutesPerMile(act.averageSpeed)}</dd>
+                </div>
+              </dl>
+            </article>
           ))}
-        </tbody>
-      </table>
+        </div>
+
+        <table className="hidden md:table min-w-full divide-y divide-gray-200 rounded-lg overflow-hidden shadow">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600">
+                Name
+              </th>
+              <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600">
+                Date
+              </th>
+              <th className="px-4 py-2 text-right text-sm font-semibold text-gray-600">
+                Distance
+              </th>
+              <th className="px-4 py-2 text-right text-sm font-semibold text-gray-600">
+                Time
+              </th>
+              <th className="px-4 py-2 text-right text-sm font-semibold text-gray-600">
+                Avg HR
+              </th>
+              <th className="px-4 py-2 text-right text-sm font-semibold text-gray-600">
+                Speed
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {activitiesSince.map((act) => (
+              <tr key={act.name + act.startDateLocal}>
+                <td className="px-4 py-2 text-sm">{act.name}</td>
+                <td className="px-4 py-2 text-sm text-gray-500">
+                  {dateFormatter.format(new Date(act.startDateLocal))}
+                </td>
+                <td className="px-4 py-2 text-sm text-right">
+                  {kmToMiles(act.distance)}
+                </td>
+                <td className="px-4 py-2 text-sm text-right">
+                  {formatMinutes(act.movingTime)}
+                </td>
+                <td className="px-4 py-2 text-sm text-right">
+                  {act.averageHR ? Math.round(act.averageHR) : "-"}
+                </td>
+                <td className="px-4 py-2 text-sm text-right">
+                  {metersPerSecondToMinutesPerMile(act.averageSpeed)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

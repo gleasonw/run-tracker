@@ -1,11 +1,12 @@
 import { db } from "@/server/db";
 import {
+  User,
   oauthAccounts,
   RunTrackerActivity,
   stravaActivities,
   userTable,
 } from "@/server/schema";
-import { getCurrentSession, RunTrackerUser } from "@/server/session";
+import { AuthenticatedUser } from "@/server/session";
 import * as arctic from "arctic";
 import { eq, gte, and, sql, lt, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -68,6 +69,61 @@ export type StravaAthlete = {
   follower: string | null;
 };
 
+export type RunTrackerUser = AuthenticatedUser & {
+  strava: {
+    athlete: StravaAthlete;
+    access_token: string;
+    refresh_token: string;
+    expires_at: number;
+  };
+};
+
+function getStravaAthleteFromExtra(extra: unknown): StravaAthlete | null {
+  return extra && typeof extra === "object" && "athlete" in extra
+    ? (extra.athlete as StravaAthlete)
+    : null;
+}
+
+function toRunTrackerUser(user: User, oauth: typeof oauthAccounts.$inferSelect) {
+  const stravaAthlete = getStravaAthleteFromExtra(oauth.extra);
+  if (!stravaAthlete) {
+    throw new Error("Strava athlete data not found");
+  }
+
+  return {
+    user,
+    strava: {
+      athlete: stravaAthlete,
+      refresh_token: oauth.refreshTokenEnc as string,
+      access_token: oauth.accessTokenEnc as string,
+      expires_at: Math.floor((oauth.accessTokenExpiresAt?.getTime() ?? 0) / 1000),
+    },
+  } satisfies RunTrackerUser;
+}
+
+export async function getStravaAccountForUser(
+  user: AuthenticatedUser
+): Promise<RunTrackerUser | null> {
+  const resp = await db
+    .select()
+    .from(oauthAccounts)
+    .where(
+      and(
+        eq(oauthAccounts.userId, user.user.id),
+        eq(oauthAccounts.provider, "strava"),
+        eq(oauthAccounts.active, true)
+      )
+    )
+    .limit(1);
+
+  const oauth = resp[0] ?? null;
+  if (!oauth) {
+    return null;
+  }
+
+  return toRunTrackerUser(user.user, oauth);
+}
+
 export async function getAccountByStravaAthleteId(
   stravaId: string
 ): Promise<RunTrackerUser | null> {
@@ -75,32 +131,18 @@ export async function getAccountByStravaAthleteId(
     .select()
     .from(oauthAccounts)
     .innerJoin(userTable, eq(oauthAccounts.userId, userTable.id))
-    .where(eq(oauthAccounts.providerAccountId, stravaId));
+    .where(
+      and(
+        eq(oauthAccounts.provider, "strava"),
+        eq(oauthAccounts.providerAccountId, stravaId),
+        eq(oauthAccounts.active, true)
+      )
+    );
   const user = resp[0]?.users ?? null;
   const oauth = resp[0]?.oauth_accounts ?? null;
 
-  const extraObject = resp[0]?.oauth_accounts.extra;
-  const stravaAthlete =
-    extraObject && typeof extraObject === "object" && "athlete" in extraObject
-      ? (extraObject.athlete as StravaAthlete)
-      : null;
-
-  if (!stravaAthlete) {
-    throw new Error("Strava athlete data not found");
-  }
-
   if (user && oauth) {
-    return {
-      user,
-      strava: {
-        athlete: stravaAthlete,
-        refresh_token: oauth.refreshTokenEnc as string,
-        access_token: oauth.accessTokenEnc as string,
-        expires_at: Math.floor(
-          (oauth.accessTokenExpiresAt?.getTime() ?? 0) / 1000
-        ),
-      },
-    };
+    return toRunTrackerUser(user, oauth);
   }
   return null;
 }
@@ -168,42 +210,36 @@ export type StravaActivityApi = {
 };
 
 // TODO: this should probably be inline to reduce roundtrip
-export const getUserTZ = cache(async function getUserTZ(user: RunTrackerUser) {
+export const getUserTZ = cache(async function getUserTZ(user: AuthenticatedUser) {
   const result = await db.execute(sql`
-		SELECT regexp_replace(timezone, '.*\\)\\s*', '') AS tz
-		FROM ${stravaActivities}
-		WHERE ${stravaActivities.userId} = ${user.user.id}
-		ORDER BY ${stravaActivities.startDate} DESC
+			SELECT regexp_replace(timezone, '.*\\)\\s*', '') AS tz
+			FROM ${stravaActivities}
+			WHERE ${stravaActivities.userId} = ${user.user.id}
+			ORDER BY ${stravaActivities.startDate} DESC
 		LIMIT 1
 	`);
   return (result.rows[0] as { tz: string } | undefined)?.tz ?? "UTC";
 });
 
-export function getUserLastSundayMidnightTimestamp(
-  user: RunTrackerUser,
-  tz: string
-) {
+export function getUserLastSundayMidnightTimestamp(tz: string) {
   return sql`
-						(
-							date_trunc('day', (NOW() AT TIME ZONE ${tz}))
-							- make_interval(days => extract(dow from (NOW() AT TIME ZONE ${tz}))::int)
-						)::timestamp
-					`;
+							(
+								date_trunc('day', (NOW() AT TIME ZONE ${tz}))
+								- make_interval(days => extract(dow from (NOW() AT TIME ZONE ${tz}))::int)
+							)::timestamp
+						`;
 }
 
-export function getUserLastLastSundayMidnightTimestamp(
-  user: RunTrackerUser,
-  tz: string
-) {
+export function getUserLastLastSundayMidnightTimestamp(tz: string) {
   return sql`
-						(
-							date_trunc('day', (NOW() AT TIME ZONE ${tz}))
-							- make_interval(days => extract(dow from (NOW() AT TIME ZONE ${tz}))::int + 7)
-						)::timestamp
-					`;
+							(
+								date_trunc('day', (NOW() AT TIME ZONE ${tz}))
+								- make_interval(days => extract(dow from (NOW() AT TIME ZONE ${tz}))::int + 7)
+							)::timestamp
+						`;
 }
 
-export async function getActivitiesLastWeekPeriod(user: RunTrackerUser) {
+export async function getActivitiesLastWeekPeriod(user: AuthenticatedUser) {
   const tz = await getUserTZ(user);
 
   console.log("Using timezone", tz);
@@ -224,11 +260,11 @@ export async function getActivitiesLastWeekPeriod(user: RunTrackerUser) {
         eq(stravaActivities.userId, user.user.id),
         gte(
           stravaActivities.startDateLocal,
-          getUserLastLastSundayMidnightTimestamp(user, tz)
+          getUserLastLastSundayMidnightTimestamp(tz)
         ),
         lt(
           stravaActivities.startDateLocal,
-          getUserLastSundayMidnightTimestamp(user, tz)
+          getUserLastSundayMidnightTimestamp(tz)
         )
       )
     )
@@ -236,7 +272,7 @@ export async function getActivitiesLastWeekPeriod(user: RunTrackerUser) {
 }
 
 export async function getActivitiesSinceLastSundayMidnight(
-  user: RunTrackerUser
+  user: AuthenticatedUser
 ) {
   const tz = await getUserTZ(user);
 
@@ -259,7 +295,7 @@ export async function getActivitiesSinceLastSundayMidnight(
         eq(stravaActivities.userId, user.user.id),
         gte(
           stravaActivities.startDateLocal,
-          getUserLastSundayMidnightTimestamp(user, tz)
+          getUserLastSundayMidnightTimestamp(tz)
         ),
         lt(
           stravaActivities.startDateLocal,
@@ -392,7 +428,12 @@ async function checkRefresh(
           refreshTokenEnc: newTokens.refresh_token,
           accessTokenExpiresAt: new Date(newTokens.expires_at * 1000),
         })
-        .where(eq(oauthAccounts.userId, user.user.id));
+        .where(
+          and(
+            eq(oauthAccounts.userId, user.user.id),
+            eq(oauthAccounts.provider, "strava")
+          )
+        );
       return {
         ...user,
         strava: {

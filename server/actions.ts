@@ -9,8 +9,7 @@ import {
 } from "@/server/schema";
 import { getCurrentSession } from "@/server/session";
 import {
-  getUserLastSundayMidnightTimestamp,
-  getUserTZ,
+  getStravaAccountForUser,
   pullLast30ActivitiesFromStrava,
 } from "@/server/strava";
 import { revalidatePath } from "next/cache";
@@ -23,7 +22,11 @@ export async function importFirst30Activities() {
   if (user === null) {
     throw new Error("Not authenticated");
   }
-  return pullLast30ActivitiesFromStrava(user);
+  const stravaUser = await getStravaAccountForUser(user);
+  if (stravaUser === null) {
+    throw new Error("Strava account not linked");
+  }
+  return pullLast30ActivitiesFromStrava(stravaUser);
 }
 
 export async function createWeeklyTarget(target: WeeklyTargetInsert) {

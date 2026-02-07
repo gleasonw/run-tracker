@@ -1,8 +1,19 @@
 import { strava, STRAVA_OAUTH_COOKIE_KEY } from "@/server/strava";
 import { generateState } from "arctic";
 import { cookies } from "next/headers";
+import { getCurrentSession } from "@/server/session";
 
 export async function GET(): Promise<Response> {
+  const { user } = await getCurrentSession();
+  if (user === null) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: "/link",
+      },
+    });
+  }
+
   const state = generateState();
   const scopes = ["read", "activity:read_all"];
 

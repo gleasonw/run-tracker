@@ -6,7 +6,7 @@ import Link from "next/link";
 export default async function ProgressionStrategyPage() {
   const session = await getCurrentSession();
   if (!session.user) {
-    return <div>Please log in to view this page.</div>;
+    return <div>Please sign in with Google to view this page.</div>;
   }
   const lastWeekActivities = await getActivitiesLastWeekPeriod(session.user);
 

@@ -1,6 +1,6 @@
 import { db } from "@/server/db";
 import { weeklyTarget } from "@/server/schema";
-import { RunTrackerUser } from "@/server/session";
+import { AuthenticatedUser } from "@/server/session";
 import {
   getUserLatestStrategy,
   isDeloadWeekForStrategy,
@@ -11,9 +11,9 @@ import {
   getUserLastSundayMidnightTimestamp,
   getUserTZ,
 } from "@/server/strava";
-import { and, eq, gte, lt, sql, desc } from "drizzle-orm";
+import { and, eq, gte, lt, desc } from "drizzle-orm";
 
-export async function getThisWeekTarget(user: RunTrackerUser) {
+export async function getThisWeekTarget(user: AuthenticatedUser) {
   const userTz = await getUserTZ(user);
   const targetsForThisWeek = await db
     .select()
@@ -21,10 +21,7 @@ export async function getThisWeekTarget(user: RunTrackerUser) {
     .where(
       and(
         eq(weeklyTarget.userId, user.user.id),
-        gte(
-          weeklyTarget.createdAt,
-          getUserLastSundayMidnightTimestamp(user, userTz)
-        )
+        gte(weeklyTarget.createdAt, getUserLastSundayMidnightTimestamp(userTz))
       )
     )
     .orderBy(desc(weeklyTarget.createdAt));
@@ -84,7 +81,7 @@ export async function getThisWeekTarget(user: RunTrackerUser) {
   return newTarget[0];
 }
 
-export async function getLastWeekTarget(user: RunTrackerUser) {
+export async function getLastWeekTarget(user: AuthenticatedUser) {
   const userTz = await getUserTZ(user);
   return await db
     .select()
@@ -94,12 +91,9 @@ export async function getLastWeekTarget(user: RunTrackerUser) {
         eq(weeklyTarget.userId, user.user.id),
         gte(
           weeklyTarget.createdAt,
-          getUserLastLastSundayMidnightTimestamp(user, userTz)
+          getUserLastLastSundayMidnightTimestamp(userTz)
         ),
-        lt(
-          weeklyTarget.createdAt,
-          getUserLastSundayMidnightTimestamp(user, userTz)
-        )
+        lt(weeklyTarget.createdAt, getUserLastSundayMidnightTimestamp(userTz))
       )
     )
     .orderBy(desc(weeklyTarget.createdAt))

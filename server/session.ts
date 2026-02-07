@@ -1,12 +1,10 @@
 import { db } from "@/server/db";
 import {
-  oauthAccounts,
   Session,
   sessionTable,
   User,
   userTable,
 } from "@/server/schema";
-import { StravaAthlete } from "@/server/strava";
 import { eq, gt, and, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { cache } from "react";
@@ -62,24 +60,19 @@ export async function createSession(user: User): Promise<SessionWithToken> {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
+    expires: new Date(now.getTime() + sessionValidTime),
   });
   return { ...newSession, token };
 }
 
-export type RunTrackerUser = {
+export type AuthenticatedUser = {
   user: User;
-  strava: {
-    athlete: StravaAthlete;
-    access_token: string;
-    refresh_token: string;
-    expires_at: number;
-  };
 };
 
 export const getCurrentSession = cache(
   async (): Promise<{
     session: Session | null;
-    user: RunTrackerUser | null;
+    user: AuthenticatedUser | null;
   }> => {
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_TOKEN_COOKIE)?.value ?? null;
@@ -118,9 +111,8 @@ export const getCurrentSession = cache(
     const maybeUser = await db
       .select()
       .from(userTable)
-      .innerJoin(oauthAccounts, eq(oauthAccounts.userId, userTable.id))
       .where(eq(userTable.id, result.userId));
-    const user = maybeUser[0]?.users ?? null;
+    const user = maybeUser[0] ?? null;
     if (!user) {
       return { session: null, user: null };
     }
@@ -134,28 +126,18 @@ export const getCurrentSession = cache(
         .set({ expiresAt: newExpiresAt })
         .where(eq(sessionTable.id, result.id));
       result.expiresAt = newExpiresAt;
-    }
-    const extraObject = maybeUser[0]?.oauth_accounts.extra;
-    const stravaAthlete =
-      extraObject && typeof extraObject === "object" && "athlete" in extraObject
-        ? (extraObject.athlete as StravaAthlete)
-        : null;
-    if (!stravaAthlete) {
-      throw new Error("Strava athlete data not found in session user");
+      cookieStore.set(SESSION_TOKEN_COOKIE, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        expires: newExpiresAt,
+      });
     }
     return {
       session: result,
       user: {
         user,
-        strava: {
-          athlete: stravaAthlete,
-          access_token: maybeUser[0]?.oauth_accounts.accessTokenEnc as string,
-          refresh_token: maybeUser[0]?.oauth_accounts.refreshTokenEnc as string,
-          expires_at: Math.floor(
-            (maybeUser[0]?.oauth_accounts.accessTokenExpiresAt?.getTime() ??
-              0) / 1000
-          ),
-        },
       },
     };
   }

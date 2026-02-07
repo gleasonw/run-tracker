@@ -1,10 +1,9 @@
 import { db } from "@/server/db";
 import { ProgressionStrategy, progressionStrategy } from "@/server/schema";
-import { RunTrackerUser } from "@/server/session";
-import { getUserTZ } from "@/server/strava";
-import { eq, desc, sql } from "drizzle-orm";
+import { AuthenticatedUser } from "@/server/session";
+import { eq, desc } from "drizzle-orm";
 
-export async function getUserLatestStrategy(user: RunTrackerUser) {
+export async function getUserLatestStrategy(user: AuthenticatedUser) {
   const userStrategyResp = await db
     .select()
     .from(progressionStrategy)
