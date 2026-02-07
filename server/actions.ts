@@ -7,13 +7,14 @@ import {
   weeklyTarget,
   WeeklyTargetInsert,
 } from "@/server/schema";
-import { getCurrentSession } from "@/server/session";
+import { getCurrentSession, invalidateCurrentSession } from "@/server/session";
 import {
   getStravaAccountForUser,
   pullLast30ActivitiesFromStrava,
 } from "@/server/strava";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 // the idea here is that we have a server action layer that I
 // believe is publicly exposed, so we need to be careful about
@@ -113,4 +114,9 @@ export async function clearProgressionStrategy() {
 
   revalidatePath("/");
   revalidatePath("/progressionStrategy");
+}
+
+export async function logout() {
+  await invalidateCurrentSession();
+  redirect("/link");
 }

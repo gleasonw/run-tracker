@@ -5,7 +5,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { importFirst30Activities } from "@/server/actions";
+import { importFirst30Activities, logout } from "@/server/actions";
 import { getCurrentSession } from "@/server/session";
 import {
   getActivitiesSinceLastSundayMidnight,
@@ -91,6 +91,11 @@ export default async function Home() {
         >
           {stravaUser ? "Import latest activities" : "Link Strava to import"}
         </Button>
+        <form action={logout}>
+          <Button variant="outline" type="submit">
+            Logout
+          </Button>
+        </form>
       </div>
 
       {thisWeekTarget === null || thisWeekTarget === undefined ? (

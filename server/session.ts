@@ -65,6 +65,24 @@ export async function createSession(user: User): Promise<SessionWithToken> {
   return { ...newSession, token };
 }
 
+export async function invalidateCurrentSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_TOKEN_COOKIE)?.value ?? null;
+  const sessionId = token?.split(".")[0] ?? null;
+
+  if (sessionId) {
+    await db.delete(sessionTable).where(eq(sessionTable.id, sessionId));
+  }
+
+  cookieStore.set(SESSION_TOKEN_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
 export type AuthenticatedUser = {
   user: User;
 };
