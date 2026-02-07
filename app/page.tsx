@@ -48,6 +48,17 @@ export default async function Home() {
     ? Math.round(Number(thisWeekTarget.activeSeconds) / 60)
     : null;
   const thisWeekCompletedMinutes = Math.round(thisWeekActivitiesSumMinutes);
+  const progressSegments =
+    thisWeekTargetMinutes && thisWeekTargetMinutes > 0
+      ? buildGoalProgressSegments(
+          [...activitiesSince].reverse(),
+          thisWeekTargetMinutes
+        )
+      : [];
+  const thisWeekCompletionPercent =
+    thisWeekTargetMinutes && thisWeekTargetMinutes > 0
+      ? clampPercent((thisWeekActivitiesSumMinutes / thisWeekTargetMinutes) * 100)
+      : 0;
 
   return (
     <div className="flex flex-col items-start gap-6 p-6">
@@ -107,6 +118,27 @@ export default async function Home() {
                   <WeeklyTargetForm existingTarget={thisWeekTarget} />
                 </PopoverContent>
               </Popover>
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
+                <span>
+                  {thisWeekCompletedMinutes} of {thisWeekTargetMinutes} min
+                </span>
+                <span>{Math.round(thisWeekCompletionPercent)}%</span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                <div className="flex h-full w-full">
+                  {progressSegments.map((segment, i) => (
+                    <div
+                      key={segment.key}
+                      className={segmentColorClasses[i % segmentColorClasses.length]}
+                      style={{ width: `${segment.widthPercent}%` }}
+                      title={segment.label}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
 
             <p className="mt-3 text-base">
@@ -244,6 +276,49 @@ function formatMinutes(seconds: number) {
 
 function kmToMiles(meters: number) {
   return ((meters / 1000) * 0.621371).toFixed(2) + " mi";
+}
+
+const segmentColorClasses = [
+  "bg-slate-900",
+  "bg-slate-800",
+  "bg-slate-700",
+  "bg-slate-600",
+  "bg-slate-500",
+];
+
+function clampPercent(percent: number) {
+  return Math.max(0, Math.min(100, percent));
+}
+
+function buildGoalProgressSegments(
+  activities: { name: string; movingTime: number; startDateLocal: unknown }[],
+  goalMinutes: number
+) {
+  let remainingGoalMinutes = goalMinutes;
+
+  return activities
+    .map((activity, i) => {
+      if (remainingGoalMinutes <= 0) {
+        return null;
+      }
+
+      const activityMinutes = activity.movingTime / 60;
+      const contributionMinutes = Math.min(
+        Math.max(0, activityMinutes),
+        remainingGoalMinutes
+      );
+      if (contributionMinutes <= 0) {
+        return null;
+      }
+
+      remainingGoalMinutes -= contributionMinutes;
+      return {
+        key: `${activity.name}-${activity.startDateLocal}-${i}`,
+        widthPercent: (contributionMinutes / goalMinutes) * 100,
+        label: `${activity.name}: ${Math.round(contributionMinutes)} min`,
+      };
+    })
+    .filter((segment): segment is NonNullable<typeof segment> => segment !== null);
 }
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
