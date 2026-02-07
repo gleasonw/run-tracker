@@ -39,15 +39,17 @@ export default async function ProgressionStrategyPage() {
       ? Math.round(
           Math.max(
             0,
-            (isNextWeekDeload && userStrategy.deloadMultiplier
+            isNextWeekDeload && userStrategy.deloadMultiplier
               ? Math.min(
-                  thisWeekTargetMinutes * userStrategy.weekProgressionMultiplier,
+                  thisWeekTargetMinutes *
+                    userStrategy.weekProgressionMultiplier,
                   strategyCapMinutes
                 ) * userStrategy.deloadMultiplier
               : Math.min(
-                  thisWeekTargetMinutes * userStrategy.weekProgressionMultiplier,
+                  thisWeekTargetMinutes *
+                    userStrategy.weekProgressionMultiplier,
                   strategyCapMinutes
-                ))
+                )
           )
         )
       : null;
@@ -65,7 +67,7 @@ export default async function ProgressionStrategyPage() {
               Active Progression Strategy
             </p>
             <form action={clearProgressionStrategy}>
-              <Button type="submit" variant="ghost" className="text-red-600">
+              <Button type="submit" variant="ghost" className="text-gray-500">
                 Clear strategy
               </Button>
             </form>
@@ -80,7 +82,9 @@ export default async function ProgressionStrategyPage() {
             </div>
             <div>
               <p className="text-gray-500">Cap goal</p>
-              <p className="text-lg font-semibold">{strategyCapMinutes} min/week</p>
+              <p className="text-lg font-semibold">
+                {strategyCapMinutes} min/week
+              </p>
             </div>
             <div>
               <p className="text-gray-500">Weekly multiplier</p>

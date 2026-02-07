@@ -57,7 +57,9 @@ export default async function Home() {
       : [];
   const thisWeekCompletionPercent =
     thisWeekTargetMinutes && thisWeekTargetMinutes > 0
-      ? clampPercent((thisWeekActivitiesSumMinutes / thisWeekTargetMinutes) * 100)
+      ? clampPercent(
+          (thisWeekActivitiesSumMinutes / thisWeekTargetMinutes) * 100
+        )
       : 0;
 
   return (
@@ -97,17 +99,9 @@ export default async function Home() {
         <div className="w-full">
           <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  This Week Goal
-                </p>
-                <h1 className="text-3xl font-bold">
-                  {thisWeekTargetMinutes} min
-                  <span className="ml-2 text-base font-medium text-gray-500">
-                    this week
-                  </span>
-                </h1>
-              </div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                This Week Goal
+              </p>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" aria-label={"Edit target"}>
@@ -120,43 +114,68 @@ export default async function Home() {
               </Popover>
             </div>
 
-            <div className="mt-4">
+            <div className="">
               <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
                 <span>
                   {thisWeekCompletedMinutes} of {thisWeekTargetMinutes} min
                 </span>
                 <span>{Math.round(thisWeekCompletionPercent)}%</span>
               </div>
-              <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+              <div className="h-4 w-full overflow-hidden rounded-full bg-gray-200">
                 <div className="flex h-full w-full">
                   {progressSegments.map((segment, i) => (
                     <div
                       key={segment.key}
-                      className={segmentColorClasses[i % segmentColorClasses.length]}
+                      className={`${
+                        segmentColorClasses[i % segmentColorClasses.length]
+                      } border-r-2 border-white last:border-r-0`}
                       style={{ width: `${segment.widthPercent}%` }}
                       title={segment.label}
                     />
                   ))}
                 </div>
               </div>
+              {progressSegments.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {progressSegments.map((segment, i) => (
+                    <span
+                      key={`${segment.key}-legend`}
+                      className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700"
+                    >
+                      <span
+                        className={`${
+                          segmentColorClasses[i % segmentColorClasses.length]
+                        } h-2 w-2 rounded-full`}
+                      />
+                      {segment.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
-            <p className="mt-3 text-base">
+            <div
+              className={`mt-4 rounded-lg py-3 ${
+                toRunMinutes > 0
+                  ? "border-gray-300 bg-white"
+                  : "border-emerald-300 bg-white"
+              }`}
+            >
               {toRunMinutes > 0 ? (
-                <>
-                  Maybe run <span className="font-bold">{toRunMinutes}</span>{" "}
-                  more minutes this week.
-                </>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-md bg-gray-900 px-2 py-1 text-xl font-bold text-white leading-none">
+                    {toRunMinutes}
+                  </span>
+                  <p className="text-xl font-semibold text-gray-900">
+                    more minutes this week
+                  </p>
+                </div>
               ) : (
-                <>
-                  You have achieved this week&apos;s goal by running{" "}
-                  <span className="font-semibold">
-                    {thisWeekCompletedMinutes}
-                  </span>{" "}
-                  minutes.
-                </>
+                <p className="text-lg font-semibold text-emerald-900">
+                  Weekly goal achieved with {thisWeekCompletedMinutes} minutes.
+                </p>
               )}
-            </p>
+            </div>
           </section>
         </div>
       )}
@@ -279,11 +298,14 @@ function kmToMiles(meters: number) {
 }
 
 const segmentColorClasses = [
-  "bg-slate-900",
-  "bg-slate-800",
-  "bg-slate-700",
-  "bg-slate-600",
-  "bg-slate-500",
+  "bg-blue-600",
+  "bg-emerald-600",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-violet-600",
+  "bg-cyan-600",
+  "bg-orange-500",
+  "bg-lime-600",
 ];
 
 function clampPercent(percent: number) {
@@ -318,7 +340,9 @@ function buildGoalProgressSegments(
         label: `${activity.name}: ${Math.round(contributionMinutes)} min`,
       };
     })
-    .filter((segment): segment is NonNullable<typeof segment> => segment !== null);
+    .filter(
+      (segment): segment is NonNullable<typeof segment> => segment !== null
+    );
 }
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
