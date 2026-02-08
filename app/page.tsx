@@ -5,7 +5,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { importFirst30Activities, logout } from "@/server/actions";
+import { logout } from "@/server/actions";
 import { getCurrentSession } from "@/server/session";
 import {
   getActivitiesSinceLastSundayMidnight,
@@ -83,14 +83,6 @@ export default async function Home() {
               : "Create progression strategy"}
           </Button>
         </Link>
-        <Button
-          variant="outline"
-          onClick={importFirst30Activities}
-          disabled={!stravaUser}
-          className="border p-3 hover:bg-gray-200 hover:cursor-pointer"
-        >
-          {stravaUser ? "Import latest activities" : "Link Strava to import"}
-        </Button>
         <form action={logout}>
           <Button variant="outline" type="submit">
             Logout
@@ -102,7 +94,7 @@ export default async function Home() {
         <WeeklyTargetForm />
       ) : (
         <div className="w-full">
-          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
             <div className="flex items-start justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 This Week Goal

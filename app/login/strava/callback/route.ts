@@ -8,6 +8,7 @@ import {
 import { cookies } from "next/headers";
 import { eq, and, ne } from "drizzle-orm";
 import * as sessions from "@/server/session";
+import { importFirst30Activities } from "@/server/actions";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -81,7 +82,9 @@ export async function GET(request: Request) {
         and(
           eq(oauthAccounts.userId, currentUser.id),
           eq(oauthAccounts.provider, "strava"),
-          existingStravaRow ? ne(oauthAccounts.id, existingStravaRow.id) : undefined
+          existingStravaRow
+            ? ne(oauthAccounts.id, existingStravaRow.id)
+            : undefined
         )
       );
 
@@ -117,6 +120,8 @@ export async function GET(request: Request) {
       });
     }
   });
+
+  await importFirst30Activities();
 
   //TODO: we should probably fetch the first batch of activities for this user
 

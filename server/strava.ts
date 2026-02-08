@@ -84,7 +84,10 @@ function getStravaAthleteFromExtra(extra: unknown): StravaAthlete | null {
     : null;
 }
 
-function toRunTrackerUser(user: User, oauth: typeof oauthAccounts.$inferSelect) {
+function toRunTrackerUser(
+  user: User,
+  oauth: typeof oauthAccounts.$inferSelect
+) {
   const stravaAthlete = getStravaAthleteFromExtra(oauth.extra);
   if (!stravaAthlete) {
     throw new Error("Strava athlete data not found");
@@ -96,7 +99,9 @@ function toRunTrackerUser(user: User, oauth: typeof oauthAccounts.$inferSelect) 
       athlete: stravaAthlete,
       refresh_token: oauth.refreshTokenEnc as string,
       access_token: oauth.accessTokenEnc as string,
-      expires_at: Math.floor((oauth.accessTokenExpiresAt?.getTime() ?? 0) / 1000),
+      expires_at: Math.floor(
+        (oauth.accessTokenExpiresAt?.getTime() ?? 0) / 1000
+      ),
     },
   } satisfies RunTrackerUser;
 }
@@ -210,7 +215,9 @@ export type StravaActivityApi = {
 };
 
 // TODO: this should probably be inline to reduce roundtrip
-export const getUserTZ = cache(async function getUserTZ(user: AuthenticatedUser) {
+export const getUserTZ = cache(async function getUserTZ(
+  user: AuthenticatedUser
+) {
   const result = await db.execute(sql`
 			SELECT regexp_replace(timezone, '.*\\)\\s*', '') AS tz
 			FROM ${stravaActivities}
@@ -369,6 +376,14 @@ export async function pullLast30ActivitiesFromStrava(user: RunTrackerUser) {
       target: [stravaActivities.userId, stravaActivities.stravaActivityId],
     });
   revalidatePath("/");
+
+  console.log(
+    `Pulled ${activities.length} activities from Strava for user ${
+      user.user.id
+    }, inserted ${
+      Array.isArray(result) ? result.length : "unknown number of"
+    } new activities`
+  );
 
   return {
     requested: activities.length,
