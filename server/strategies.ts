@@ -4,12 +4,16 @@ import { AuthenticatedUser } from "@/server/session";
 import { and, eq, desc } from "drizzle-orm";
 
 export async function getUserLatestStrategy(user: AuthenticatedUser) {
+  return getUserLatestStrategyByUserId(user.user.id);
+}
+
+export async function getUserLatestStrategyByUserId(userId: string) {
   const userStrategyResp = await db
     .select()
     .from(progressionStrategy)
     .where(
       and(
-        eq(progressionStrategy.userId, user.user.id),
+        eq(progressionStrategy.userId, userId),
         eq(progressionStrategy.active, true)
       )
     )

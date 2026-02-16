@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start"
+    "start": "next start",
+    "weekly-target-rollover": "tsx server/scripts/run-weekly-target-rollover.ts"
   },
   "dependencies": {
     "@highcharts/react": "4.0.0-beta.5",
@@ -16,6 +17,7 @@
     "clsx": "^2.1.1",
     "dotenv": "^17.2.2",
     "drizzle-orm": "^0.44.5",
+    "effect": "^3.19.17",
     "highcharts": "^12.4.0",
     "lucide-react": "^0.544.0",
     "next": "15.5.9",

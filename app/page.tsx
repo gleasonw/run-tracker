@@ -11,7 +11,7 @@ import {
   getActivitiesSinceLastSundayMidnight,
   getStravaAccountForUser,
 } from "@/server/strava";
-import { getThisWeekTarget as getThisWeekTargetOrMakeNew } from "@/server/targets";
+import { getThisWeekTarget } from "@/server/targets";
 import { Edit } from "lucide-react";
 import Link from "next/link";
 import { getUserLatestStrategy } from "@/server/strategies";
@@ -30,8 +30,7 @@ export default async function Home() {
     session.user
   );
   const userStrategy = await getUserLatestStrategy(session.user);
-  // TODO: we should probably do this in a cron or something, rather than on page visit.
-  const thisWeekTarget = await getThisWeekTargetOrMakeNew(session.user);
+  const thisWeekTarget = await getThisWeekTarget(session.user);
   const thisWeekActivitiesSumMinutes = activitiesSince.reduce(
     (acc, activity) => {
       return acc + activity.movingTime / 60;
