@@ -13,7 +13,7 @@ function getCurrentPacificWeekStartTimestamp() {
   return sql`
     (
       date_trunc('day', (NOW() AT TIME ZONE ${PACIFIC_TIMEZONE}))
-      - make_interval(days => extract(dow from (NOW() AT TIME ZONE ${PACIFIC_TIMEZONE}))::int)
+      - make_interval(days => ((extract(dow from (NOW() AT TIME ZONE ${PACIFIC_TIMEZONE}))::int + 6) % 7))
     )::timestamp
   `;
 }

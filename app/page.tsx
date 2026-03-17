@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { logout } from "@/server/actions";
 import { getCurrentSession } from "@/server/session";
 import {
-  getActivitiesSinceLastSundayMidnight,
+  getActivitiesSinceCurrentWeekStart,
   getStravaAccountForUser,
 } from "@/server/strava";
 import { getThisWeekTarget } from "@/server/targets";
@@ -26,9 +26,7 @@ export default async function Home() {
     );
   }
   const stravaUser = await getStravaAccountForUser(session.user);
-  const activitiesSince = await getActivitiesSinceLastSundayMidnight(
-    session.user
-  );
+  const activitiesSince = await getActivitiesSinceCurrentWeekStart(session.user);
   const userStrategy = await getUserLatestStrategy(session.user);
   const thisWeekTarget = await getThisWeekTarget(session.user);
   const thisWeekActivitiesSumMinutes = activitiesSince.reduce(

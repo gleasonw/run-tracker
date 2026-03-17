@@ -37,14 +37,14 @@ export function isDeloadWeekForStrategyAtOffset(
   ) {
     return false;
   }
-  const thisWeekStartSunday = getStartOfWeekSunday(new Date());
-  const anchorWeekSunday = getStartOfWeekSunday(strategy.anchorDate);
-  if (thisWeekStartSunday < anchorWeekSunday) {
+  const thisWeekStartMonday = getStartOfWeekMonday(new Date());
+  const anchorWeekMonday = getStartOfWeekMonday(strategy.anchorDate);
+  if (thisWeekStartMonday < anchorWeekMonday) {
     return false;
   }
 
   const weeksSinceAnchorStart = Math.floor(
-    (thisWeekStartSunday.getTime() - anchorWeekSunday.getTime()) / 604_800_000
+    (thisWeekStartMonday.getTime() - anchorWeekMonday.getTime()) / 604_800_000
   );
   const weekIndex = weeksSinceAnchorStart + offsetWeeks;
 
@@ -54,9 +54,9 @@ export function isDeloadWeekForStrategyAtOffset(
   );
 }
 
-function getStartOfWeekSunday(date: Date) {
+function getStartOfWeekMonday(date: Date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - d.getDay());
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return d;
 }

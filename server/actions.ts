@@ -55,11 +55,13 @@ export async function createProgressionStrategy(
   if (user === null) {
     throw new Error("Not authenticated");
   }
-  const nextSundayMidnight = new Date();
-  nextSundayMidnight.setHours(0, 0, 0, 0);
-  const dow = nextSundayMidnight.getDate();
-  const daysToNextSunday = (7 - dow) % 7 || 7;
-  nextSundayMidnight.setDate(nextSundayMidnight.getDate() + daysToNextSunday);
+  const nextMondayMidnight = new Date();
+  nextMondayMidnight.setHours(0, 0, 0, 0);
+  const dayOfWeek = nextMondayMidnight.getDay();
+  const daysToNextMonday = ((8 - dayOfWeek) % 7) || 7;
+  nextMondayMidnight.setDate(
+    nextMondayMidnight.getDate() + daysToNextMonday
+  );
   const newStrategy = await db.transaction(async (tx) => {
     await tx
       .update(progressionStrategy)
@@ -79,7 +81,7 @@ export async function createProgressionStrategy(
       .values({
         userId: user.user.id,
         name: strategy.name,
-        anchorDate: nextSundayMidnight,
+        anchorDate: nextMondayMidnight,
         capTargetSeconds: strategy.capTargetSeconds,
         deloadEveryNWeeks: strategy.deloadEveryNWeeks,
         deloadMultiplier: strategy.deloadMultiplier,

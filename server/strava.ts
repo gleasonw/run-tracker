@@ -228,22 +228,22 @@ export const getUserTZ = cache(async function getUserTZ(
   return (result.rows[0] as { tz: string } | undefined)?.tz ?? "UTC";
 });
 
-export function getUserLastSundayMidnightTimestamp(tz: string) {
+export function getUserCurrentWeekStartTimestamp(tz: string) {
   return sql`
-							(
-								date_trunc('day', (NOW() AT TIME ZONE ${tz}))
-								- make_interval(days => extract(dow from (NOW() AT TIME ZONE ${tz}))::int)
-							)::timestamp
-						`;
+								(
+									date_trunc('day', (NOW() AT TIME ZONE ${tz}))
+									- make_interval(days => ((extract(dow from (NOW() AT TIME ZONE ${tz}))::int + 6) % 7))
+								)::timestamp
+							`;
 }
 
-export function getUserLastLastSundayMidnightTimestamp(tz: string) {
+export function getUserPreviousWeekStartTimestamp(tz: string) {
   return sql`
-							(
-								date_trunc('day', (NOW() AT TIME ZONE ${tz}))
-								- make_interval(days => extract(dow from (NOW() AT TIME ZONE ${tz}))::int + 7)
-							)::timestamp
-						`;
+								(
+									${getUserCurrentWeekStartTimestamp(tz)}
+									- interval '7 days'
+								)::timestamp
+							`;
 }
 
 export async function getActivitiesLastWeekPeriod(user: AuthenticatedUser) {
@@ -267,18 +267,18 @@ export async function getActivitiesLastWeekPeriod(user: AuthenticatedUser) {
         eq(stravaActivities.userId, user.user.id),
         gte(
           stravaActivities.startDateLocal,
-          getUserLastLastSundayMidnightTimestamp(tz)
+          getUserPreviousWeekStartTimestamp(tz)
         ),
         lt(
           stravaActivities.startDateLocal,
-          getUserLastSundayMidnightTimestamp(tz)
+          getUserCurrentWeekStartTimestamp(tz)
         )
       )
     )
     .orderBy(desc(stravaActivities.startDateLocal));
 }
 
-export async function getActivitiesSinceLastSundayMidnight(
+export async function getActivitiesSinceCurrentWeekStart(
   user: AuthenticatedUser
 ) {
   const tz = await getUserTZ(user);
@@ -302,7 +302,7 @@ export async function getActivitiesSinceLastSundayMidnight(
         eq(stravaActivities.userId, user.user.id),
         gte(
           stravaActivities.startDateLocal,
-          getUserLastSundayMidnightTimestamp(tz)
+          getUserCurrentWeekStartTimestamp(tz)
         ),
         lt(
           stravaActivities.startDateLocal,
