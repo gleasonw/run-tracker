@@ -31,9 +31,17 @@ export default async function ProgressionStrategyPage() {
   const isNextWeekDeload = userStrategy
     ? isDeloadWeekForStrategyAtOffset(userStrategy, 1)
     : false;
-  const nextWeekEstimate =
+  const currentWeekNonDeloadEquivalentMinutes =
     userStrategy &&
     thisWeekTargetMinutes &&
+    isCurrentWeekDeload &&
+    userStrategy.deloadMultiplier &&
+    userStrategy.deloadMultiplier > 0
+      ? thisWeekTargetMinutes / userStrategy.deloadMultiplier
+      : thisWeekTargetMinutes;
+  const nextWeekEstimate =
+    userStrategy &&
+    currentWeekNonDeloadEquivalentMinutes &&
     strategyCapMinutes &&
     userStrategy.weekProgressionMultiplier
       ? Math.round(
@@ -41,12 +49,12 @@ export default async function ProgressionStrategyPage() {
             0,
             isNextWeekDeload && userStrategy.deloadMultiplier
               ? Math.min(
-                  thisWeekTargetMinutes *
+                  currentWeekNonDeloadEquivalentMinutes *
                     userStrategy.weekProgressionMultiplier,
                   strategyCapMinutes
                 ) * userStrategy.deloadMultiplier
               : Math.min(
-                  thisWeekTargetMinutes *
+                  currentWeekNonDeloadEquivalentMinutes *
                     userStrategy.weekProgressionMultiplier,
                   strategyCapMinutes
                 )

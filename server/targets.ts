@@ -4,6 +4,7 @@ import { AuthenticatedUser } from "@/server/session";
 import {
   getUserLatestStrategyByUserId,
   isDeloadWeekForStrategy,
+  isDeloadWeekForStrategyAtOffset,
 } from "@/server/strategies";
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 
@@ -33,6 +34,59 @@ function getCurrentPacificWeekStartTimestamptz() {
 
 function getPreviousPacificWeekStartTimestamptz() {
   return sql`(${getPreviousPacificWeekStartTimestamp()} AT TIME ZONE ${PACIFIC_TIMEZONE})`;
+}
+
+function getPacificWeekStartTimestamptzAtOffset(weeksAgo: number) {
+  return sql`((${getCurrentPacificWeekStartTimestamp()} - make_interval(days => ${
+    weeksAgo * 7
+  })) AT TIME ZONE ${PACIFIC_TIMEZONE})`;
+}
+
+async function getWeeklyMovingSecondsByWeekOffset(
+  userId: string,
+  weeksAgo: number
+) {
+  const weeklyActivitiesAggregate = await db
+    .select({
+      totalMovingTime: sql<number>`COALESCE(SUM(${stravaActivities.movingTime}), 0)`,
+    })
+    .from(stravaActivities)
+    .where(
+      and(
+        eq(stravaActivities.userId, userId),
+        gte(
+          stravaActivities.startDate,
+          getPacificWeekStartTimestamptzAtOffset(weeksAgo)
+        ),
+        lt(
+          stravaActivities.startDate,
+          getPacificWeekStartTimestamptzAtOffset(weeksAgo - 1)
+        )
+      )
+    )
+    .limit(1);
+
+  return Number(weeklyActivitiesAggregate[0]?.totalMovingTime ?? 0);
+}
+
+async function getWeekTargetByUserIdAndOffset(userId: string, weeksAgo: number) {
+  const targets = await db
+    .select()
+    .from(weeklyTarget)
+    .where(
+      and(
+        eq(weeklyTarget.userId, userId),
+        gte(weeklyTarget.createdAt, getPacificWeekStartTimestamptzAtOffset(weeksAgo)),
+        lt(
+          weeklyTarget.createdAt,
+          getPacificWeekStartTimestamptzAtOffset(weeksAgo - 1)
+        )
+      )
+    )
+    .orderBy(desc(weeklyTarget.createdAt))
+    .limit(1);
+
+  return targets[0] ?? null;
 }
 
 export async function getThisWeekTarget(user: AuthenticatedUser) {
@@ -74,31 +128,31 @@ export async function createThisWeekTargetFromLastWeek(userId: string) {
   }
 
   const userStrategy = await getUserLatestStrategyByUserId(userId);
-  const lastWeekTargetResponse = await getLastWeekTargetByUserId(userId);
-  const lastWeekTarget = lastWeekTargetResponse[0];
-  const lastWeekActivitiesAggregate = await db
-    .select({
-      totalMovingTime: sql<number>`COALESCE(SUM(${stravaActivities.movingTime}), 0)`,
-    })
-    .from(stravaActivities)
-    .where(
-      and(
-        eq(stravaActivities.userId, userId),
-        gte(
-          stravaActivities.startDate,
-          getPreviousPacificWeekStartTimestamptz()
-        ),
-        lt(stravaActivities.startDate, getCurrentPacificWeekStartTimestamptz())
-      )
-    )
-    .limit(1);
-  const lastWeekSumActiveSeconds = Number(
-    lastWeekActivitiesAggregate[0]?.totalMovingTime ?? 0
+  const shouldUsePreDeloadWeekAsBase = Boolean(
+    userStrategy &&
+      !isDeloadWeekForStrategy(userStrategy) &&
+      isDeloadWeekForStrategyAtOffset(userStrategy, -1)
+  );
+  let baseWeekOffset = shouldUsePreDeloadWeekAsBase ? 2 : 1;
+
+  let baseWeekTarget = await getWeekTargetByUserIdAndOffset(userId, baseWeekOffset);
+  let baseWeekSumActiveSeconds = await getWeeklyMovingSecondsByWeekOffset(
+    userId,
+    baseWeekOffset
   );
 
-  console.log({ lastWeekSumActiveSeconds });
+  if (baseWeekOffset === 2 && baseWeekSumActiveSeconds <= 0) {
+    baseWeekOffset = 1;
+    baseWeekTarget = await getWeekTargetByUserIdAndOffset(userId, baseWeekOffset);
+    baseWeekSumActiveSeconds = await getWeeklyMovingSecondsByWeekOffset(
+      userId,
+      baseWeekOffset
+    );
+  }
 
-  if (lastWeekSumActiveSeconds <= 0) {
+  console.log({ baseWeekOffset, baseWeekSumActiveSeconds });
+
+  if (baseWeekSumActiveSeconds <= 0) {
     return {
       target: null,
       created: false,
@@ -107,10 +161,10 @@ export async function createThisWeekTargetFromLastWeek(userId: string) {
 
   let newThisWeekActiveSeconds = 0;
   const base =
-    lastWeekTarget &&
-    Number(lastWeekTarget.activeSeconds) < lastWeekSumActiveSeconds
-      ? Number(lastWeekTarget.activeSeconds)
-      : lastWeekSumActiveSeconds;
+    baseWeekTarget &&
+    Number(baseWeekTarget.activeSeconds) < baseWeekSumActiveSeconds
+      ? Number(baseWeekTarget.activeSeconds)
+      : baseWeekSumActiveSeconds;
   if (userStrategy) {
     if (
       isDeloadWeekForStrategy(userStrategy) &&
@@ -169,16 +223,6 @@ export async function getLastWeekTarget(user: AuthenticatedUser) {
 }
 
 export async function getLastWeekTargetByUserId(userId: string) {
-  return db
-    .select()
-    .from(weeklyTarget)
-    .where(
-      and(
-        eq(weeklyTarget.userId, userId),
-        gte(weeklyTarget.createdAt, getPreviousPacificWeekStartTimestamptz()),
-        lt(weeklyTarget.createdAt, getCurrentPacificWeekStartTimestamptz())
-      )
-    )
-    .orderBy(desc(weeklyTarget.createdAt))
-    .limit(1);
+  const lastWeekTarget = await getWeekTargetByUserIdAndOffset(userId, 1);
+  return lastWeekTarget ? [lastWeekTarget] : [];
 }
