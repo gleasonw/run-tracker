@@ -236,14 +236,16 @@ function weeksToReachStrategySeconds(
     startActiveSeconds: baselineActiveSeconds,
   } = partialStrategy;
 
+  const startSeconds = baselineActiveSeconds ?? 0;
+
   // invalid / degenerate
-  if (target == null || !m || m < 1 || baselineActiveSeconds <= 0) {
+  if (target == null || !m || m < 1 || startSeconds <= 0) {
     return Infinity;
   }
 
-  if (baselineActiveSeconds >= target) return 0;
+  if (startSeconds >= target) return 0;
 
-  return Math.ceil(Math.log(target / baselineActiveSeconds) / Math.log(m));
+  return Math.ceil(Math.log(target / startSeconds) / Math.log(m));
 }
 
 function activeSecondsAtWeek(args: {
@@ -260,7 +262,7 @@ function activeSecondsAtWeek(args: {
     capTargetSeconds,
     startActiveSeconds,
   } = args.partialStrategy;
-  const startSeconds = startActiveSeconds;
+  const startSeconds = startActiveSeconds ?? 0;
   const weeksSinceStart = args.weekSinceStart;
 
   if (

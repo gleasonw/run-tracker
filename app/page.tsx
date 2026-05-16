@@ -303,6 +303,12 @@ function RunLengthOptions({
   weeklyTarget: WeeklyTarget;
   currentStrategy: ProgressionStrategy;
 }) {
+  if (
+    !currentStrategy.runsPerWeek ||
+    !currentStrategy.longRunPercentageOfVolume
+  ) {
+    return;
+  }
   const potentialLongRunSeconds =
     Number(weeklyTarget.activeSeconds) *
     currentStrategy.longRunPercentageOfVolume;

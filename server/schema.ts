@@ -128,11 +128,9 @@ export const progressionStrategy = pgTable("progression_strategies", {
   deloadEveryNWeeks: integer("deload_every_n_weeks"),
   deloadMultiplier: doublePrecision("deload_multiplier"),
   active: boolean("active").default(true).notNull(),
-  startActiveSeconds: integer("start_active_seconds").notNull(),
-  runsPerWeek: integer("runs_per_week").notNull(),
-  longRunPercentageOfVolume: doublePrecision(
-    "long_run_percentage_of_volume"
-  ).notNull(),
+  startActiveSeconds: integer("start_active_seconds"),
+  runsPerWeek: integer("runs_per_week"),
+  longRunPercentageOfVolume: doublePrecision("long_run_percentage_of_volume"),
 });
 
 export const stravaVisibilityEnum = pgEnum("strava_visibility", [
