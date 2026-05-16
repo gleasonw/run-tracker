@@ -15,6 +15,11 @@ import { getThisWeekTarget } from "@/server/targets";
 import { Edit } from "lucide-react";
 import Link from "next/link";
 import { getUserLatestStrategy } from "@/server/strategies";
+import {
+  ProgressionStrategy,
+  WeeklyTarget,
+  WeeklyTargetInsert,
+} from "@/server/schema";
 
 export default async function Home() {
   const session = await getCurrentSession();
@@ -26,7 +31,9 @@ export default async function Home() {
     );
   }
   const stravaUser = await getStravaAccountForUser(session.user);
-  const activitiesSince = await getActivitiesSinceCurrentWeekStart(session.user);
+  const activitiesSince = await getActivitiesSinceCurrentWeekStart(
+    session.user
+  );
   const userStrategy = await getUserLatestStrategy(session.user);
   const thisWeekTarget = await getThisWeekTarget(session.user);
   const thisWeekActivitiesSumMinutes = activitiesSince.reduce(
@@ -96,6 +103,7 @@ export default async function Home() {
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 This Week Goal
               </p>
+
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" aria-label={"Edit target"}>
@@ -107,7 +115,21 @@ export default async function Home() {
                 </PopoverContent>
               </Popover>
             </div>
+            <span className="text-lg font-medium">
+              {thisWeekTargetMinutes} min
+            </span>
 
+            {thisWeekTarget && userStrategy ? (
+              <RunLengthOptions
+                weeklyTarget={thisWeekTarget}
+                currentStrategy={userStrategy}
+              />
+            ) : null}
+          </section>
+          <section className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm mt-4 flex flex-col gap-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              This Week Actual
+            </p>
             <div className="">
               <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
                 <span>
@@ -270,6 +292,35 @@ export default async function Home() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function RunLengthOptions({
+  weeklyTarget,
+  currentStrategy,
+}: {
+  weeklyTarget: WeeklyTarget;
+  currentStrategy: ProgressionStrategy;
+}) {
+  const potentialLongRunSeconds =
+    Number(weeklyTarget.activeSeconds) *
+    currentStrategy.longRunPercentageOfVolume;
+  const remaining =
+    Number(weeklyTarget.activeSeconds) - potentialLongRunSeconds;
+  const otherRuns = remaining / (currentStrategy.runsPerWeek - 1);
+  return (
+    <div className="w-full flex gap-2 flex-wrap justify-between py-3">
+      <div>
+        <label className="block text-sm mb-1">Long run</label>
+        <div>{Math.round(potentialLongRunSeconds / 60)} minutes</div>
+      </div>
+      {Array.from({ length: currentStrategy.runsPerWeek - 1 }).map((_, i) => (
+        <div key={i}>
+          <label className="block text-sm mb-1">Run {i + 1}</label>
+          <div>{Math.round(otherRuns / 60)} minutes</div>
+        </div>
+      ))}
     </div>
   );
 }

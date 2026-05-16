@@ -128,6 +128,11 @@ export const progressionStrategy = pgTable("progression_strategies", {
   deloadEveryNWeeks: integer("deload_every_n_weeks"),
   deloadMultiplier: doublePrecision("deload_multiplier"),
   active: boolean("active").default(true).notNull(),
+  startActiveSeconds: integer("start_active_seconds").notNull(),
+  runsPerWeek: integer("runs_per_week").notNull(),
+  longRunPercentageOfVolume: doublePrecision(
+    "long_run_percentage_of_volume"
+  ).notNull(),
 });
 
 export const stravaVisibilityEnum = pgEnum("strava_visibility", [
@@ -252,6 +257,8 @@ export type RunTrackerActivity = InferSelectModel<typeof stravaActivities>;
 export type Session = InferSelectModel<typeof sessionTable>;
 export type User = InferSelectModel<typeof userTable>;
 export type WeeklyTargetInsert = InferInsertModel<typeof weeklyTarget>;
+export type WeeklyTarget = InferSelectModel<typeof weeklyTarget>;
+
 export type ProgressionStrategyInsert = InferInsertModel<
   typeof progressionStrategy
 >;

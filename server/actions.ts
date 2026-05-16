@@ -58,10 +58,8 @@ export async function createProgressionStrategy(
   const nextMondayMidnight = new Date();
   nextMondayMidnight.setHours(0, 0, 0, 0);
   const dayOfWeek = nextMondayMidnight.getDay();
-  const daysToNextMonday = ((8 - dayOfWeek) % 7) || 7;
-  nextMondayMidnight.setDate(
-    nextMondayMidnight.getDate() + daysToNextMonday
-  );
+  const daysToNextMonday = (8 - dayOfWeek) % 7 || 7;
+  nextMondayMidnight.setDate(nextMondayMidnight.getDate() + daysToNextMonday);
   const newStrategy = await db.transaction(async (tx) => {
     await tx
       .update(progressionStrategy)
@@ -80,13 +78,8 @@ export async function createProgressionStrategy(
       .insert(progressionStrategy)
       .values({
         userId: user.user.id,
-        name: strategy.name,
         anchorDate: nextMondayMidnight,
-        capTargetSeconds: strategy.capTargetSeconds,
-        deloadEveryNWeeks: strategy.deloadEveryNWeeks,
-        deloadMultiplier: strategy.deloadMultiplier,
-        weekProgressionMultiplier: strategy.weekProgressionMultiplier,
-        active: strategy.active,
+        ...strategy,
       })
       .returning();
   });

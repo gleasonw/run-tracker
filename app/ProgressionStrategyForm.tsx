@@ -13,6 +13,9 @@ type ProgressionStrategyFrom = {
   deloadMultiplier: string;
   weekProgressionMultiplier: string;
   active: boolean;
+  startActiveMinutes: string;
+  runsPerWeek: string;
+  longRunPercentageOfVolume: string;
 };
 
 export default function ProgressionStrategyForm({
@@ -20,21 +23,23 @@ export default function ProgressionStrategyForm({
 }: {
   previousWeekActivities: { movingTime: number }[];
 }) {
+  const lastWeekSumActiveSeconds = previousWeekActivities?.reduce(
+    (acc, activity) => acc + activity.movingTime,
+    0
+  );
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<ProgressionStrategyFrom>({
     name: "",
     capTargetMinutes: "",
-    deloadEveryNWeeks: "",
-    deloadMultiplier: "",
+    deloadEveryNWeeks: "3",
+    deloadMultiplier: "0.8",
     weekProgressionMultiplier: "",
     active: true,
+    startActiveMinutes: String(Math.round(lastWeekSumActiveSeconds / 60)),
+    runsPerWeek: "4",
+    longRunPercentageOfVolume: "0.30",
   });
-
-  const lastWeekSumActiveSeconds = previousWeekActivities?.reduce(
-    (acc, activity) => acc + activity.movingTime,
-    0
-  );
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -46,25 +51,26 @@ export default function ProgressionStrategyForm({
     }));
   }
 
-  function castFormToNumber(toNumberForm: ProgressionStrategyFrom) {
+  function castFormToNumber(
+    toNumberForm: ProgressionStrategyFrom
+  ): Omit<ProgressionStrategyInsert, "anchorDate"> {
     return {
       ...toNumberForm,
-      capTargetMinutes: Number(toNumberForm.capTargetMinutes),
+      capTargetSeconds: Number(toNumberForm.capTargetMinutes) * 60,
       deloadEveryNWeeks: Number(toNumberForm.deloadEveryNWeeks),
       deloadMultiplier: Number(toNumberForm.deloadMultiplier),
       weekProgressionMultiplier: Number(toNumberForm.weekProgressionMultiplier),
+      startActiveSeconds: Number(toNumberForm.startActiveMinutes) * 60,
+      runsPerWeek: Number(toNumberForm.runsPerWeek),
+      longRunPercentageOfVolume: Number(toNumberForm.longRunPercentageOfVolume),
     };
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
-    const toNumber = castFormToNumber(form);
     try {
-      await createProgressionStrategy({
-        ...toNumber,
-        capTargetSeconds: toNumber.capTargetMinutes * 60,
-      });
+      await createProgressionStrategy(castFormToNumber(form));
       router.push("/");
       router.refresh();
     } finally {
@@ -72,15 +78,7 @@ export default function ProgressionStrategyForm({
     }
   }
 
-  const weeksToHitTarget = weeksToReachStrategySeconds(
-    lastWeekSumActiveSeconds,
-    {
-      capTargetSeconds: Number(form.capTargetMinutes) * 60,
-      deloadEveryNWeeks: Number(form.deloadEveryNWeeks),
-      deloadMultiplier: Number(form.deloadMultiplier),
-      weekProgressionMultiplier: Number(form.weekProgressionMultiplier),
-    }
-  );
+  const weeksToHitTarget = weeksToReachStrategySeconds(castFormToNumber(form));
 
   // TODO: should probably adjust this based on time to hit... just go a few weeks beyond
   const sampleSpreadFor20Weeks = [
@@ -90,13 +88,7 @@ export default function ProgressionStrategyForm({
   ].map((i) =>
     Math.round(
       activeSecondsAtWeek({
-        partialStrategy: {
-          capTargetSeconds: Number(form.capTargetMinutes) * 60,
-          deloadEveryNWeeks: Number(form.deloadEveryNWeeks),
-          deloadMultiplier: Number(form.deloadMultiplier),
-          weekProgressionMultiplier: Number(form.weekProgressionMultiplier),
-        },
-        startSeconds: lastWeekSumActiveSeconds,
+        partialStrategy: castFormToNumber(form),
         weekSinceStart: i,
       }) / 60
     )
@@ -112,6 +104,18 @@ export default function ProgressionStrategyForm({
           </span>
           . How do you want to progress from there?
         </p>
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Start Active Minutes
+          </label>
+          <Input
+            type="number"
+            name="startActiveMinutes"
+            value={form.startActiveMinutes}
+            onChange={handleChange}
+            className="w-full rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
         <div>
           <label className="block text-sm font-medium mb-1">
             Every week, multiply total minutes by
@@ -136,6 +140,30 @@ export default function ProgressionStrategyForm({
             type="number"
             name="capTargetMinutes"
             value={form.capTargetMinutes}
+            onChange={handleChange}
+            className="w-full rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Target number of runs per week
+          </label>
+          <Input
+            type="number"
+            name="runsPerWeek"
+            value={form.runsPerWeek}
+            onChange={handleChange}
+            className="w-full rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Long run percentage of weekly volume
+          </label>
+          <Input
+            type="number"
+            name="longRunPercentageOfVolume"
+            value={form.longRunPercentageOfVolume}
             onChange={handleChange}
             className="w-full rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
           />
@@ -197,14 +225,15 @@ export default function ProgressionStrategyForm({
 }
 
 function weeksToReachStrategySeconds(
-  baselineActiveSeconds: number,
-  partialStrategy: Omit<ProgressionStrategyInsert, "anchorDate" | "name">
+  partialStrategy: Omit<
+    ProgressionStrategyInsert,
+    "anchorDate" | "name" | "runsPerWeek" | "longRunPercentageOfVolume"
+  >
 ) {
   const {
-    deloadEveryNWeeks: k,
-    deloadMultiplier: d,
     weekProgressionMultiplier: m,
     capTargetSeconds: target,
+    startActiveSeconds: baselineActiveSeconds,
   } = partialStrategy;
 
   // invalid / degenerate
@@ -219,16 +248,19 @@ function weeksToReachStrategySeconds(
 
 function activeSecondsAtWeek(args: {
   weekSinceStart: number;
-  partialStrategy: Omit<ProgressionStrategyInsert, "anchorDate" | "name">;
-  startSeconds: number;
+  partialStrategy: Omit<
+    ProgressionStrategyInsert,
+    "anchorDate" | "name" | "runsPerWeek" | "longRunPercentageOfVolume"
+  >;
 }) {
   const {
     deloadEveryNWeeks,
     deloadMultiplier,
     weekProgressionMultiplier,
     capTargetSeconds,
+    startActiveSeconds,
   } = args.partialStrategy;
-  const startSeconds = args.startSeconds;
+  const startSeconds = startActiveSeconds;
   const weeksSinceStart = args.weekSinceStart;
 
   if (

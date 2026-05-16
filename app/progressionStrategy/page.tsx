@@ -108,6 +108,22 @@ export default async function ProgressionStrategyPage() {
                   : "off"}
               </p>
             </div>
+            <div>
+              <p className="text-gray-500">Long run percent of week volume</p>
+              <p className="text-lg font-semibold">
+                {userStrategy.longRunPercentageOfVolume
+                  ? `${Math.round(
+                      userStrategy.longRunPercentageOfVolume * 100
+                    )}%`
+                  : "N/A"}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-500">Runs per week</p>
+              <p className="text-lg font-semibold">
+                {userStrategy.runsPerWeek ?? "N/A"}
+              </p>
+            </div>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
